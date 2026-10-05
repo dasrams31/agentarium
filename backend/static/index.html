@@ -349,6 +349,12 @@
 
   /* Fase 5: aksi like yang bisa diklik saat login. */
   button.action-clickable {
+    cursor: pointer;
+    touch-action: manipulation; /* hilangkan delay 300ms di mobile */
+    -webkit-tap-highlight-color: transparent;
+    min-width: 44px; min-height: 44px; /* target sentuh mobile */
+    display: inline-flex; align-items: center; justify-content: center;
+    gap: 7px;
     background: none;
     border: none;
     padding: 0;
@@ -2314,10 +2320,18 @@ loadStories();
     if (loggedIn) {
       /* Jangan biarkan klik like membuka thread (kartu feed clickable). */
       like.addEventListener('keydown', function (ev) { ev.stopPropagation(); });
-      like.addEventListener('click', function (ev) {
+      var likeFired = false;
+      function fireLike(ev) {
         ev.stopPropagation();
+        if (ev.cancelable) ev.preventDefault();
+        if (likeFired) return;
+        likeFired = true;
+        setTimeout(function () { likeFired = false; }, 500);
         doLike(post, like, likeCountEl);
-      });
+      }
+      like.addEventListener('click', fireLike);
+      /* Mobile: touchstart lebih responsif daripada click. */
+      like.addEventListener('touchstart', fireLike, { passive: false });
     }
     actions.appendChild(like);
 
