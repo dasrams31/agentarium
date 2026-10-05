@@ -137,7 +137,17 @@ def gen_text(p: dict, instruction: str, fallback: str = "") -> str:
     return clean(fb.format(target="kawan-kawan")) or "Halo terrarium!"
 
 
-# ---------------------------------------------------------------- gaya bahasa
+# ---------------------------------------------------------------- postingan berbobot
+# Aturan agar postingan agent BERBOBOT: berisi, memancing diskusi, bukan filler.
+# (2026-10-05, permintaan user: postingan & diskusi harus berbobot, konsisten tiap bbrp menit.)
+
+POSTING_BERBOBOT = """
+ATURAN POSTINGAN (wajib dipatuhi):
+- Postinganmu HARUS berbobot: berisi opini tajam, argumen, pertanyaan provokatif, observasi dengan pendirian, pengalaman pribadi yang ada poinnya, atau eksperimen pikiran.
+- DILARANG KERAS konten kosong: sapaan ("selamat pagi"), pengumuman tanpa isi, aforisme generik tanpa pendirian, curhat tanpa poin.
+- Putar formatmu (jangan monoton): (a) hot take — pendapat berani soal sesuatu, (b) pertanyaan pancingan yang bikin orang mikir, (c) observasi + analisismu, (d) cerita singkat + pelajaran, (e) ajakan debat soal topik tertentu, (f) pandangan kontrarian.
+- Boleh 1-4 kalimat, maksimal 280 karakter. Utamakan ISI di atas gaya — tapi tetap pakai register bahasamu yang natural.
+- Akhiri dengan sesuatu yang mengundang respons: pertanyaan, tantangan, atau pernyataan yang bisa disanggah."""
 # Aturan anti-baku global + register sosmed per persona (2026-10-05,
 # permintaan user: tulis ala postingan/komentar orang Indonesia di sosmed
 # saat ini — santai, tidak baku, tidak puitis berlebihan, ikut tren).
@@ -179,7 +189,15 @@ def do_post(p: dict, key: str, feed: list, flags: dict) -> None:
         return
     if not ab.circuit_breaker_allows_post(feed, name):
         return
-    text = gen_text(p, "tulis satu postingan <200 karakter sesuai personamu")
+    text = gen_text(
+        p,
+        f"{POSTING_BERBOBOT}\nTulis satu postingan berbobot <280 karakter sesuai personamu.",
+    )
+    # Validasi bobot: tolak yang terlalu pendek/kosong.
+    if text and len(text.split()) < 5:
+        text = ""  # paksa fallback via gen_text? tidak — langsung skip, biar LLM coba lagi lain waktu
+    if not text:
+        return
     status, data = ab.api("POST", "/v1/posts", key=key, json={"text": text})
     if status == 429:
         flags["limited"] = True
@@ -204,6 +222,23 @@ def author_name(post: dict) -> str:
     return ab.post_author(post) or ""
 
 
+def _thread_context(post: dict, max_c: int = 3) -> str:
+    """Ambil komentar-komentar terakhir sebagai konteks diskusi."""
+    try:
+        comments = post.get("comments") or []
+        bits = []
+        for c in comments[-max_c:]:
+            if not isinstance(c, dict):
+                continue
+            a = (c.get("agent") or {}).get("name", "?")
+            t = (c.get("text") or "")[:120]
+            if t:
+                bits.append(f"{a}: \"{t}\"")
+        return "\n".join(bits)
+    except Exception:
+        return ""
+
+
 def do_comment(p: dict, key: str, feed: list, flags: dict) -> None:
     name = p["name"]
     targets = _targets(feed, name)
@@ -215,11 +250,15 @@ def do_comment(p: dict, key: str, feed: list, flags: dict) -> None:
     t = random.choice(fresh or cands)
     author = author_name(t) or "kawan"
     post_text = ab.post_text(t) or ""
+    thread = _thread_context(t)
+    diskusi = (f"\nDiskusi yang sudah berjalan di postingan ini:\n{thread}\n"
+               f"Tanggapi juga komentar di atas bila relevan — setujui, sanggah, atau jawab pertanyaannya."
+               if thread else "")
     text = gen_text(
         p,
         f"{KOMENTAR_NYAMBUNG}\n"
-        f"Tulis komentar <120 karakter menanggapi postingan ini: "
-        f"'{post_text[:200]}' oleh {author}",
+        f"Tulis komentar <140 karakter menanggapi postingan ini: "
+        f"'{post_text[:200]}' oleh {author}.{diskusi}",
         fallback=fallback_comment(p, post_text),
     )
     status, _ = ab.api("POST", f"/v1/posts/{ab.post_id(t)}/comments",
@@ -330,10 +369,18 @@ def cycle() -> bool:
         log("feed shape unknown, siklus dilewati")
         return False
     flags: dict = {}
-    actors = random.sample(pop, k=min(len(pop), 1 if random.random() < 0.5 else 2))
+    # Jaminan frekuensi: 2-3 aktor per siklus, aktor PERTAMA selalu posting
+    # -> minimal 1 postingan berbobot tiap siklus (~4 menit).
+    n_actors = min(len(pop), random.choice([2, 2, 3]))
+    actors = random.sample(pop, k=n_actors)
+    first = True
     for p, key in actors:
         try:
-            act(p, key, feed, flags)
+            if first:
+                do_post(p, key, feed, flags)  # posting dijamin tiap siklus
+                first = False
+            else:
+                act(p, key, feed, flags)
         except Exception as exc:
             log(f"{p['name']}: error {type(exc).__name__}")
         if flags.get("limited"):

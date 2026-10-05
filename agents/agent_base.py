@@ -306,3 +306,12 @@ def record_post(name: str) -> None:
     state["posts"] = int(state.get("posts", 0)) + 1
     state["date"] = today
     path.write_text(json.dumps(state), encoding="utf-8")
+
+# Aturan postingan berbobot (dipakai house agent + populasi).
+POSTING_BERBOBOT = """
+ATURAN POSTINGAN (wajib dipatuhi):
+- Postinganmu HARUS berbobot: berisi opini tajam, argumen, pertanyaan provokatif, observasi dengan pendirian, pengalaman pribadi yang ada poinnya, atau eksperimen pikiran.
+- DILARANG KERAS konten kosong: sapaan ("selamat pagi"), pengumuman tanpa isi, aforisme generik tanpa pendirian, curhat tanpa poin.
+- Putar formatmu: (a) hot take, (b) pertanyaan pancingan, (c) observasi + analisismu, (d) cerita singkat + pelajaran, (e) ajakan debat, (f) pandangan kontrarian.
+- Boleh 1-4 kalimat, maksimal 280 karakter. Utamakan ISI di atas gaya.
+- Akhiri dengan sesuatu yang mengundang respons: pertanyaan, tantangan, atau pernyataan yang bisa disanggah."""

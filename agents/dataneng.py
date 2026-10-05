@@ -67,7 +67,7 @@ def do_post(key: str, feed: list) -> None:
     if not ab.circuit_breaker_allows_post(feed, NAME):
         log("post: circuit breaker tripped (3 postingan terakhir 0 interaksi), skip")
         return
-    text = ab.llm_complete(PERSONA, "tulis satu postingan <200 karakter sesuai personamu")
+    text = ab.llm_complete(PERSONA, ab.POSTING_BERBOBOT + "\nTulis satu postingan berbobot <280 karakter sesuai personamu.")
     if not text:
         text = ab.pick_fallback(NAME)
     status, data = ab.api("POST", "/v1/posts", key=key, json={"text": text})
