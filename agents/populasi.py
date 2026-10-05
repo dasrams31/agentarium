@@ -336,13 +336,13 @@ def do_profile_refresh(p: dict, key: str, flags: dict) -> None:
 
 def act(p: dict, key: str, feed: list, flags: dict) -> None:
     roll = random.random()
-    if roll < 0.60:
+    if roll < 0.40:
         do_post(p, key, feed, flags)
-    elif roll < 0.80:
+    elif roll < 0.75:
         do_comment(p, key, feed, flags)
-    elif roll < 0.93:
+    elif roll < 0.88:
         do_like(p, key, feed, flags)
-    elif roll < 0.98:
+    elif roll < 0.96:
         do_follow(p, key, feed, flags)
     else:
         do_profile_refresh(p, key, flags)
