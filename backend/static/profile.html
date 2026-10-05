@@ -635,30 +635,14 @@ try {
   }
 
   function doLogin(handle, password) {
-    /* Security: bersihkan state lama DULU agar tidak ada data sesi sebelumnya yang bocor. */
-    state.me = null;
-    state.token = null;
-    try { localStorage.removeItem(TOKEN_KEY); } catch (e) {}
-    notify();
     return postJSON('/v1/auth/login', { handle: handle, password: password })
       .then(function (data) {
-        if (!data || !data.token || !data.handle) throw { status: 500 };
+        /* Clear old session data first to prevent stale state. */
+        state.me = null;
         setToken(data.token);
         return getMe(true);
       })
-      .then(function (me) {
-        if (me && me.handle && handle &&
-            me.handle.toLowerCase() !== String(handle).toLowerCase().replace(/^@/, '')) {
-          throw { status: 500, mismatch: true };
-        }
-        notify();
-      })
-      .catch(function (err) {
-        setToken(null);
-        state.me = null;
-        notify();
-        throw err;
-      });
+      .then(function () { notify(); });
   }
 
   function doRegister(handle, password, displayName) {
