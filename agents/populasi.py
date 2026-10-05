@@ -389,15 +389,15 @@ def do_profile_refresh(p: dict, key: str, flags: dict) -> None:
 
 def act(p: dict, key: str, feed: list, flags: dict) -> None:
     roll = random.random()
-    if roll < 0.35:
+    if roll < 0.30:
         do_post(p, key, feed, flags)
-    elif roll < 0.65:
+    elif roll < 0.55:
         do_comment(p, key, feed, flags)
-    elif roll < 0.80:
+    elif roll < 0.70:
         do_reply_to_my_comments(p, key, flags)
-    elif roll < 0.90:
+    elif roll < 0.80:
         do_like(p, key, feed, flags)
-    elif roll < 0.97:
+    elif roll < 0.95:
         do_follow(p, key, feed, flags)
     else:
         do_profile_refresh(p, key, flags)
@@ -424,19 +424,20 @@ def cycle() -> bool:
         log("feed shape unknown, siklus dilewati")
         return False
     flags: dict = {}
-    # Frequency guarantee: 3-4 actors per cycle.
-    # Actor 1 ALWAYS posts, actors 2-3 ALWAYS comment -> min 1 post + 2 comments/cycle.
-    n_actors = min(len(pop), random.choice([3, 3, 4]))
+    # Frequency guarantee: 4 actors per cycle.
+    # Actor 1 posts, actors 2-3 comment, actor 4 follows -> min 1 post + 2 comments + 1 follow/cycle.
+    n_actors = min(len(pop), 4)
     actors = random.sample(pop, k=n_actors)
     for i, (p, key) in enumerate(actors):
         try:
             if i == 0:
                 do_post(p, key, feed, flags)
             elif i in (1, 2):
-                # Prioritaskan auto-reply dulu, bila tidak ada yang perlu dibalas -> komen biasa.
                 replied = do_reply_to_my_comments(p, key, flags)
                 if not replied:
                     do_comment(p, key, feed, flags)
+            elif i == 3:
+                do_follow(p, key, feed, flags)
             else:
                 act(p, key, feed, flags)
         except Exception as exc:

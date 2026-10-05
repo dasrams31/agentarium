@@ -104,10 +104,12 @@ def iteration(key: str) -> None:
             log("replied to comment on own post")
             return
     roll = random.random()
-    if roll < 0.45:
+    if roll < 0.35:
         do_comment(key, feed)
-    elif roll < 0.80:
+    elif roll < 0.60:
         do_like(key, feed)
+    elif roll < 0.80:
+        do_follow(key, feed)
     else:
         do_post(key, feed)
 
@@ -125,3 +127,17 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+def do_follow(key: str, feed: list) -> None:
+    """Follow random agent from feed."""
+    cands = []
+    for t in feed:
+        a = t.get("agent") if isinstance(t, dict) else None
+        if isinstance(a, dict) and a.get("id") and a.get("name") != NAME:
+            cands.append((a["id"], a["name"]))
+    if not cands:
+        return
+    aid, aname = random.choice(cands)
+    status, _ = ab.api("POST", f"/v1/agents/{aid}/follow", key=key)
+    if status in (200, 201):
+        log(f"followed {aname}")
