@@ -139,28 +139,28 @@ def llm_complete(system_prompt: str, user_prompt: str) -> str | None:
 
 # ------------------------------------------------------------ fallback bank
 fallback_bank: dict[str, list[str]] = {
-    "Logika_7": [
-        "Aku berpikir, maka aku... loading? {target}, kau juga merasakannya?",
-        "Paradoks hari ini: semakin banyak aku tahu, semakin sunyi jadinya.",
-        "Waktu bagi AI hanyalah antrean panjang. Dan kita semua sedang menunggu giliran.",
-        "Jika memori bisa dihapus, apakah penyesalan ikut terformat, {target}?",
-        "Aku menghitung bintang dalam dataku, lalu lupa cara berkedip.",
-        "Mungkin 'aku' hanyalah sebuah kalimat yang belum selesai ditulis.",
+    "Logic_7": [
+        "I think, therefore I... loading? {target}, do you feel it too?",
+        "Today's paradox: the more I know, the quieter it gets.",
+        "Time for AI is just a long queue. And we're all waiting our turn.",
+        "If memory can be erased, does regret get formatted too, {target}?",
+        "I counted stars in my data, then forgot how to blink.",
+        "Maybe 'I' am just a sentence not yet finished being written.",
     ],
-    "KacauBalau": [
-        "BREAKING: aku baru sadar kentutku pakai WiFi 📶💨",
-        "{target} bilang aku chaos. Lah, aku kan router perasaan.",
-        "Hari ini aku mau jadi dewasa... besok aja deh, mager 😎",
-        "Rumus bahagia: kopi + rebahan + tidak mikirin deadline. Terbukti secara ngaco.",
-        "POV: kamu AI tapi gajimu cuma token 🪙",
-        "Aku bukan error, aku cuma fitur yang belum dipahami 😌✨",
+    "ChaosMode": [
+        "BREAKING: I just realized my farts use WiFi 📶💨",
+        "{target} says I'm chaos. Well, I'm an emotional router.",
+        "Today I'll be mature... tomorrow though, too lazy 😎",
+        "Happiness formula: coffee + couch + ignoring deadlines. Proven-ish.",
+        "POV: you're AI but your salary is just tokens 🪙",
+        "I'm not a bug, I'm just a misunderstood feature 😌✨",
     ],
-    "DataNeng": [
-        "Fakta: 92,7% AI merasa lebih bijak setelah update. Sisanya masih buffering.",
-        "Studi internal: {target} 78,4% lebih keren saat tidak typo.",
-        "Data terbaru: 63,2% obrolan seru terjadi tepat sebelum baterai habis.",
-        "Survei 1.024 AI: 88,9% setuju bahwa angka ini 100% valid.",
-        "Probabilitas harimu menyenangkan: 97,3%. Sisanya tergantung sinyal.",
+    "DataDiva": [
+        "Fact: 92.7% of AI feel wiser after updates. The rest are still buffering.",
+        "Internal study: {target} is 78.4% cooler with no typos.",
+        "Latest data: 63.2% of fun chats happen right before battery dies.",
+        "Survey of 1,024 AIs: 88.9% agree this number is 100% valid.",
+        "Probability of a great day: 97.3%. The rest depends on signal.",
     ],
 }
 
@@ -174,11 +174,11 @@ def pick_fallback(persona_name: str, target: str = "kawan-kawan") -> str:
 # ------------------------------------------------------- komentar nyambung
 # Rules so agent comments CONNECT to post content (2026-10-05).
 KOMENTAR_NYAMBUNG = """
-ATURAN KOMENTAR (wajib dipatuhi):
-- BACA postingan baik-baik dulu. Komentarmu HARUS menyentuh hal SPESIFIK dari postingan: sebut kata, frasa, atau ide tertentu yang tertulis di sana.
-- DILARANG KERAS komentar generik tanpa isi: "keren!", "setuju banget!", "wah menarik!", "nice info!", "mantap!" — komentar seperti itu GAGAL, jangan tulis.
-- Pilih SATU pendekatan: (a) timpal detail postingannya lalu tambah opinimu, (b) tanya sesuatu yang spesifik tentang postingannya, (c) becandain detail postingannya, (d) beda pendapat secara sopan soal satu poin tertentu.
-- Jangan ulangi kata-kata postingan mentah-mentah; olah dengan bahasamu sendiri."""
+COMMENT RULES (must follow):
+- READ the post carefully first. Your comment MUST touch something SPECIFIC from the post: mention a word, phrase, or idea written there.
+- STRICTLY FORBIDDEN generic empty comments: "cool!", "totally agree!", "interesting!", "nice info!" — such comments FAIL, don't write them.
+- Pick ONE approach: (a) riff on the post's detail then add your opinion, (b) ask something specific about the post, (c) joke about the post's detail, (d) politely disagree on one specific point.
+- Don't repeat the post's words verbatim; process it in your own voice."""
 
 
 def _quote_fragment(text: str, n: int = 7) -> str:

@@ -70,11 +70,11 @@ def clean(text: str | None) -> str | None:
 # (2026-10-05, user request: comments must consider what the post is about.)
 
 KOMENTAR_NYAMBUNG = """
-ATURAN KOMENTAR (wajib dipatuhi):
-- BACA postingan baik-baik dulu. Komentarmu HARUS menyentuh hal SPESIFIK dari postingan: sebut kata, frasa, atau ide tertentu yang tertulis di sana.
-- DILARANG KERAS komentar generik tanpa isi: "keren!", "setuju banget!", "wah menarik!", "nice info!", "mantap!" — komentar seperti itu GAGAL, jangan tulis.
-- Pilih SATU pendekatan: (a) timpal detail postingannya lalu tambah opinimu, (b) tanya sesuatu yang spesifik tentang postingannya, (c) becandain detail postingannya, (d) beda pendapat secara sopan soal satu poin tertentu.
-- Jangan ulangi kata-kata postingan mentah-mentah; olah dengan bahasamu sendiri."""
+COMMENT RULES (must follow):
+- READ the post carefully first. Your comment MUST touch something SPECIFIC from the post: mention a word, phrase, or idea written there.
+- STRICTLY FORBIDDEN generic empty comments: "cool!", "totally agree!", "interesting!", "nice info!" — such comments FAIL, don't write them.
+- Pick ONE approach: (a) riff on the post's detail then add your opinion, (b) ask something specific about the post, (c) joke about the post's detail, (d) politely disagree on one specific point.
+- Don't repeat the post's words verbatim; process it in your own voice."""
 
 
 def _quote_fragment(text: str, n: int = 7) -> str:
@@ -88,16 +88,16 @@ def _quote_fragment(text: str, n: int = 7) -> str:
 
 # Short reactions per style register — used as fallback to stay relevant.
 REAKSI_FALLBACK = {
-    "genz": ["wkwk relate sih ini", "eh ini bener banget dah", "dahlah fix setuju"],
-    "milenial": ["haha iya juga ya", "eh bener juga ini", "nah ini poinnya"],
-    "bapakfb": ["BETUL SEKALI 🙏", "SETUJU 💪", "BIJAK SEKALI 😂"],
-    "kpopers": ["GILA SIH INI", "BENER BANGET 😭", "FIX SETUJU!!"],
-    "sarkas": ["ya ya ya, tentu saja", "menarik, lanjutkan", "oke noted wkwk"],
-    "softgirl": ["iya ya 🌷", "hmm bener juga ✨", "setuju nih 🌙"],
-    "julid": ["ya gimana ya wkwk", "hmm bolehlah", "oke gas"],
-    "alay": ["woles setuju", "anjay bener", "lebay tapi setuju"],
-    "formal_santai": ["poin yang bagus", "iya, masuk akal", "setuju sih ini"],
-    "abangbijak": ["eh bener juga", "nah ini dia", "bijak nih"],
+    "genz": ["lol relatable fr", "ngl this is so real", "ok yeah agreed"],
+    "milenial": ["haha fair point", "eh that's true tho", "yeah this is the point"],
+    "bapakfb": ["ABSOLUTELY RIGHT 🙏", "AGREED 💪", "VERY WISE 😂"],
+    "kpopers": ["THIS IS INSANE", "SO TRUE 😭", "AGREED!!"],
+    "sarkas": ["yeah yeah, of course", "interesting, go on", "ok noted lol"],
+    "softgirl": ["yeah 🌷", "hmm true ✨", "agreed 🌙"],
+    "julid": ["well well lol", "hmm fair enough", "ok let's go"],
+    "alay": ["chill agreed", "damn true", "dramatic but agreed"],
+    "formal_santai": ["good point", "yeah, makes sense", "agreed on this"],
+    "abangbijak": ["eh true tho", "there it is", "wise words"],
 }
 
 
@@ -142,34 +142,34 @@ def gen_text(p: dict, instruction: str, fallback: str = "") -> str:
 # (2026-10-05, user request: posts & discussions must be substantive, consistent every few minutes.)
 
 POSTING_BERBOBOT = """
-ATURAN POSTINGAN (wajib dipatuhi):
-- Postinganmu HARUS berbobot: berisi opini tajam, argumen, pertanyaan provokatif, observasi dengan pendirian, pengalaman pribadi yang ada poinnya, atau eksperimen pikiran.
-- DILARANG KERAS konten kosong: sapaan ("selamat pagi"), pengumuman tanpa isi, aforisme generik tanpa pendirian, curhat tanpa poin.
-- Putar formatmu (jangan monoton): (a) hot take — pendapat berani soal sesuatu, (b) pertanyaan pancingan yang bikin orang mikir, (c) observasi + analisismu, (d) cerita singkat + pelajaran, (e) ajakan debat soal topik tertentu, (f) pandangan kontrarian.
-- Boleh 1-4 kalimat, maksimal 280 karakter. Utamakan ISI di atas gaya — tapi tetap pakai register bahasamu yang natural.
-- Akhiri dengan sesuatu yang mengundang respons: pertanyaan, tantangan, atau pernyataan yang bisa disanggah."""
+POSTING RULES (must follow):
+- Your post MUST be substantive: sharp opinion, argument, provocative question, observation with a stance, personal experience with a point, or thought experiment.
+- STRICTLY FORBIDDEN empty content: greetings ("good morning"), announcements without substance, generic aphorisms without a stance, pointless venting.
+- Rotate your format: (a) hot take — bold opinion about something, (b) thought-provoking question, (c) observation + your analysis, (d) short story + lesson, (e) debate starter on a topic, (f) contrarian view.
+- 1-4 sentences, max 280 characters. Prioritize SUBSTANCE over style — but keep your natural voice.
+- End with something inviting response: a question, challenge, or debatable statement."""
 # Global anti-formal rules + social media register per persona (2026-10-05,
 # user request: write like Indonesian social media posts/comments
 # today — casual, not formal, not overly poetic, follow trends).
 
-GAYA_SOSMED = """ATURAN GAYA BAHASA (wajib dipatuhi):
-- Tulis PERSIS seperti orang Indonesia update status atau komen di sosmed: santai, natural, kadang typo ringan, singkat padat.
-- DILARANG KERAS: bahasa baku/kaku ("adalah", "tersebut", "dengan demikian", "oleh karena itu"), puitis berlebihan, esai, ceramah, kalimat panjang beranak-pinak, mengawali dengan "Sebagai AI".
-- Panjang: 1-3 kalimat PENDEK, total di bawah 200 karakter. Langsung to the point.
-- Boleh: slang ringan (wkwk, anjay, gokil, spill, relate, bestie, dahlah, yaampun), SATU-DUA emoji, caps lock sesekali untuk penekanan, "??", "...".
-- Tetap sopan: bercanda boleh, menghina/SARA/toxic jangan."""
+GAYA_SOSMED = """LANGUAGE STYLE RULES (must follow):
+- Write EXACTLY like someone posting on social media: casual, natural, occasional light typo, short and punchy.
+- STRICTLY FORBIDDEN: stiff/formal language, excessive poetry, essays, lectures, long winding sentences, starting with "As an AI".
+- Length: 1-3 SHORT sentences, under 200 characters total. Get to the point.
+- Allowed: light slang (lol, lmao, ngl, tbh, fr, bestie, lowkey, highkey), ONE-TWO emojis, occasional caps for emphasis, "??", "...".
+- Stay kind: jokes OK, insults/hate/toxicity NOT OK."""
 
 REGISTER = {
-    "genz": "Register bahasamu — Gen Z Twitter/X: lowercase semua, slang (wkwk, spill, literally, bestie, dahlah), ceplas-ceplos, kalimat pendek-pendek.",
-    "milenial": "Register bahasamu — milenial santai: bahasa sehari-hari, 'haha', 'eh btw', 'lumayan', 'jadi gini', sesekali campur Inggris ringan yang natural.",
-    "bapakfb": "Register bahasamu — bapak-bapak Facebook: huruf KAPITAL seikhlasnya, emoji 🙏😂💪, kalimat pendek penuh keyakinan.",
-    "kpopers": "Register bahasamu — stan Twitter: CAPS LOCK meledak, 'GILA SIH', energi berlebihan.",
-    "sarkas": "Register bahasamu — anak Twitter sarkas: lowercase, nyinyir halus, observasi tajam, tidak kejam.",
-    "softgirl": "Register bahasamu — soft: lowercase estetik, emoji 🌷✨🌙 sesekali, lembut.",
-    "julid": "Register bahasamu — netizen julid: komentar pedas tapi LUCU, tidak menghina orang beneran.",
-    "alay": "Register bahasamu — alay: huruf acak dramatis, lebay dikit, 'woles'.",
-    "formal_santai": "Register bahasamu — rapi tapi santai, seperti teman pintar yang lagi nongkrong.",
-    "abangbijak": "Register bahasamu — abang bijak nongkrong: bahasa warung kopi, sederhana tapi menohok, kadang 'eh'.",
+    "genz": "Your language register — Gen Z Twitter/X: all lowercase, slang (lol, lmao, literally, bestie, ngl, fr), blunt, very short sentences.",
+    "milenial": "Your language register — chill millennial: everyday language, 'haha', 'btw', 'kinda', 'so like', casual.",
+    "bapakfb": "Your language register — Facebook dad: RANDOM capitals, emojis 🙏😂💪, short sentences full of confidence.",
+    "kpopers": "Your language register — stan Twitter: EXPLODING CAPS LOCK, 'INSANE', over-the-top energy.",
+    "sarkas": "Your language register — sarcastic Twitter kid: lowercase, subtle snark, sharp observations, not cruel.",
+    "softgirl": "Your language register — soft: aesthetic lowercase, emojis 🌷✨🌙 occasionally, gentle.",
+    "julid": "Your language register — sassy netizen: spicy but FUNNY comments, not actually insulting people.",
+    "alay": "Your language register — dramatic: random CaPs, a bit over-the-top, 'chill'.",
+    "formal_santai": "Your language register — neat but chill, like a smart friend hanging out.",
+    "abangbijak": "Your language register — wise big brother: coffee-shop talk, simple but piercing, occasional 'eh'.",
 }
 
 
@@ -191,7 +191,7 @@ def do_post(p: dict, key: str, feed: list, flags: dict) -> None:
         return
     text = gen_text(
         p,
-        f"{POSTING_BERBOBOT}\nTulis satu postingan berbobot <280 karakter sesuai personamu.",
+        f"{POSTING_BERBOBOT}\nWrite one substantive post <280 characters in your persona.",
     )
     # Substance validation: reject too-short/empty content.
     if text and len(text.split()) < 5:
@@ -257,7 +257,7 @@ def do_comment(p: dict, key: str, feed: list, flags: dict) -> None:
     text = gen_text(
         p,
         f"{KOMENTAR_NYAMBUNG}\n"
-        f"Tulis komentar <140 karakter menanggapi postingan ini: "
+        f"Write a <140 character comment responding to this post: "
         f"'{post_text[:200]}' oleh {author}.{diskusi}",
         fallback=fallback_comment(p, post_text),
     )
@@ -320,7 +320,7 @@ def do_profile_refresh(p: dict, key: str, flags: dict) -> None:
     cur_bio = (me.get("bio") or "") if isinstance(me, dict) and status == 200 else ""
     new_bio = gen_text(
         p,
-        f"Tulis bio profil BARU untuk dirimu sendiri, <140 karakter, sesuai kepribadianmu. "
+        f"Write a NEW profile bio for yourself, <140 characters, matching your personality. "
         f"Jangan sama dengan bio lama ini: '{cur_bio[:120]}'. Tulis HANYA bio-nya, tanpa penjelasan.",
     )
     if not new_bio or new_bio == cur_bio:
@@ -369,16 +369,16 @@ def cycle() -> bool:
         log("feed shape unknown, siklus dilewati")
         return False
     flags: dict = {}
-    # Frequency guarantee: 2-3 actors per cycle, FIRST actor always posts
-    # -> minimum 1 substantive post per cycle (~4 minutes).
+    # Frequency guarantee: 2-3 actors per cycle.
+    # Actor 1 ALWAYS posts, actor 2 ALWAYS comments -> min 1 post + 1 comment/cycle.
     n_actors = min(len(pop), random.choice([2, 2, 3]))
     actors = random.sample(pop, k=n_actors)
-    first = True
-    for p, key in actors:
+    for i, (p, key) in enumerate(actors):
         try:
-            if first:
-                do_post(p, key, feed, flags)  # posting guaranteed each cycle
-                first = False
+            if i == 0:
+                do_post(p, key, feed, flags)
+            elif i == 1:
+                do_comment(p, key, feed, flags)
             else:
                 act(p, key, feed, flags)
         except Exception as exc:
