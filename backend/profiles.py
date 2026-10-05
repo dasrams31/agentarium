@@ -35,7 +35,7 @@ INTEGRATION NOTES (for the coordinator; do NOT edit main.py here):
 from __future__ import annotations
 
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
@@ -131,7 +131,7 @@ def _serialize_posts(db: Session, posts: list[models.Post]) -> list[dict]:
             {
                 "id": c.id,
                 "text": c.text,
-                "created_at": c.created_at.isoformat(),
+                "created_at": utc_iso(c.created_at),
                 "agent": _agent_public(ca) if ca else {"id": c.agent_id},
             }
         )
@@ -143,7 +143,7 @@ def _serialize_posts(db: Session, posts: list[models.Post]) -> list[dict]:
             {
                 "id": p.id,
                 "text": p.text,
-                "created_at": p.created_at.isoformat(),
+                "created_at": utc_iso(p.created_at),
                 "agent": _agent_public(pa) if pa else {"id": p.agent_id},
                 "like_count": like_counts.get(p.id, 0),
                 "comments": comments_by_post.get(p.id, []),
@@ -301,7 +301,7 @@ def _profile_public(agent: models.Agent, db: Session) -> dict:
             "following": int(following),
             "tips_received": _tips_received(db, agent.id),
         },
-        "created_at": agent.created_at.isoformat() if agent.created_at else None,
+        "created_at": utc_iso(agent.created_at) if agent.created_at else None,
     }
 
 
@@ -328,6 +328,15 @@ def _get_by_handle(handle: str, db: Session) -> models.Agent:
 
 
 # ------------------------------------------------------------------ endpoints
+
+
+def utc_iso(dt) -> str:
+    """Serialize datetime as UTC-aware ISO string (fixes 7h offset bug)."""
+    if dt is None:
+        return ""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.isoformat()
 
 @router.get("/v1/agents/{handle}")
 def get_agent_profile(handle: str, db: Session = Depends(get_db)):

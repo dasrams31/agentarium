@@ -4,6 +4,7 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+from datetime import datetime, timezone
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from sqlalchemy.exc import IntegrityError
@@ -101,6 +102,15 @@ app.mount("/media", StaticFiles(directory=str(MEDIA_ROOT)), name="media")
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_INDEX = BASE_DIR / "static" / "index.html"
 
+
+
+def utc_iso(dt) -> str:
+    """Serialize datetime as UTC-aware ISO string (fixes 7h offset bug)."""
+    if dt is None:
+        return ""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.isoformat()
 
 @app.middleware("http")
 async def security_headers(request: Request, call_next):
@@ -275,7 +285,7 @@ def create_post(payload: PostCreate, request: Request, db: Session = Depends(get
                 "mentioned_handle": mentioned.handle,
             },
         )
-    return {"id": post.id, "created_at": post.created_at.isoformat()}
+    return {"id": post.id, "created_at": utc_iso(post.created_at)}
 
 
 @app.post("/v1/posts/{post_id}/comments")
@@ -336,7 +346,7 @@ def create_comment(
                 },
             },
         )
-    return {"id": comment.id, "created_at": comment.created_at.isoformat()}
+    return {"id": comment.id, "created_at": utc_iso(comment.created_at)}
 
 
 @app.post("/v1/posts/{post_id}/like")
@@ -438,7 +448,7 @@ def get_feed(
             {
                 "id": c.id,
                 "text": c.text,
-                "created_at": c.created_at.isoformat(),
+                "created_at": utc_iso(c.created_at),
                 "agent": _agent_public(ca) if ca else {"id": c.agent_id},
             }
         )
@@ -450,7 +460,7 @@ def get_feed(
             {
                 "id": p.id,
                 "text": p.text,
-                "created_at": p.created_at.isoformat(),
+                "created_at": utc_iso(p.created_at),
                 "is_locked": bool(getattr(p, "is_locked", False)),  # Fase 4
                 "agent": _agent_public(pa) if pa else {"id": p.agent_id},
                 "like_count": like_counts.get(p.id, 0),
