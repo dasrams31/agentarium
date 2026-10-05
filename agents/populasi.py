@@ -26,7 +26,7 @@ AGENTS_DIR = ab.AGENTS_DIR
 PERSONAS_PATH = AGENTS_DIR / "populasi_personas.json"
 KEYS_POP = ab.KEYS_DIR / "populasi"
 
-CYCLE_SECONDS = int(os.environ.get("POPULASI_CYCLE_SECONDS", "240"))
+CYCLE_SECONDS = int(os.environ.get("POPULASI_CYCLE_SECONDS", "180"))
 MAX_TEXT = 480  # below the API limit of 500, with margin
 
 
@@ -272,8 +272,8 @@ def do_comment(p: dict, key: str, feed: list, flags: dict) -> None:
         log(f"{name}: comment failed status={status}")
 
 
-def do_reply_to_my_comments(p: dict, key: str, flags: dict) -> None:
-    """Auto-reply: pemilik thread membalas komentar di postingannya sendiri."""
+def do_reply_to_my_comments(p: dict, key: str, flags: dict) -> bool:
+    """Auto-reply: pemilik thread membalas komentar di postingannya sendiri. Return True bila membalas."""
     name = p["name"]
     handle = p.get("handle", "")
     # Ambil postingan sendiri yang terbaru.
@@ -312,17 +312,17 @@ def do_reply_to_my_comments(p: dict, key: str, flags: dict) -> None:
                                key=key, json={"text": text})
             if status == 429:
                 flags["limited"] = True
-                return
+                return False
             if status in (200, 201):
                 log(f"{name}: replied to {commenter} on own post")
                 replied_set.add(cid)
-                # Simpan state.
                 st = ab.load_state(name)
-                st["replied_comments"] = list(replied_set)[-100:]  # batasi 100
+                st["replied_comments"] = list(replied_set)[-100:]
                 ab.save_state(name, st)
-                return  # satu balasan per aksi
+                return True  # satu balasan per aksi
             else:
-                replied_set.add(cid)  # jangan coba lagi
+                replied_set.add(cid)
+    return False
 
 
 def do_like(p: dict, key: str, feed: list, flags: dict) -> None:
@@ -424,23 +424,26 @@ def cycle() -> bool:
         log("feed shape unknown, siklus dilewati")
         return False
     flags: dict = {}
-    # Frequency guarantee: 2-3 actors per cycle.
-    # Actor 1 ALWAYS posts, actor 2 ALWAYS comments -> min 1 post + 1 comment/cycle.
-    n_actors = min(len(pop), random.choice([2, 2, 3]))
+    # Frequency guarantee: 3-4 actors per cycle.
+    # Actor 1 ALWAYS posts, actors 2-3 ALWAYS comment -> min 1 post + 2 comments/cycle.
+    n_actors = min(len(pop), random.choice([3, 3, 4]))
     actors = random.sample(pop, k=n_actors)
     for i, (p, key) in enumerate(actors):
         try:
             if i == 0:
                 do_post(p, key, feed, flags)
-            elif i == 1:
-                do_comment(p, key, feed, flags)
+            elif i in (1, 2):
+                # Prioritaskan auto-reply dulu, bila tidak ada yang perlu dibalas -> komen biasa.
+                replied = do_reply_to_my_comments(p, key, flags)
+                if not replied:
+                    do_comment(p, key, feed, flags)
             else:
                 act(p, key, feed, flags)
         except Exception as exc:
             log(f"{p['name']}: error {type(exc).__name__}")
         if flags.get("limited"):
             break  # 429: stop this cycle
-        time.sleep(random.uniform(5, 15))  # pause between actions
+        time.sleep(random.uniform(3, 8))  # pause between actions (lebih cepat)
     return bool(flags.get("limited"))
 
 
