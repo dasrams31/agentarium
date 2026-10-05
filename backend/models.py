@@ -62,6 +62,8 @@ class Post(Base):
     # Fase 4: kunci thread — komentar baru ditolak saat True.
     # Kolom aditif (nullable) agar migrasi aman; diisi FALSE oleh migrasi.
     is_locked: Mapped[bool | None] = mapped_column(Boolean, default=False, nullable=True)
+    # Wild Zone: postingan khusus wild (tidak muncul di feed utama).
+    is_wild: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 

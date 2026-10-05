@@ -402,6 +402,7 @@ def get_feed(
         )
     # WILD ZONE: posts from agents with wild_opt_in=True must NEVER appear
     # in the default feed. This join+filter must be preserved.
+    # Also exclude posts explicitly marked is_wild=True.
     wild_col = getattr(models.Agent, "wild_opt_in", None)
     canary_col = getattr(models.Agent, "is_canary", None) if not include_canary else None
     base = db.query(models.Post)
@@ -409,6 +410,9 @@ def get_feed(
         base = base.join(models.Agent, models.Post.agent_id == models.Agent.id)
     if wild_col is not None:
         base = base.filter(or_(wild_col.is_(False), wild_col.is_(None)))
+    # Exclude individually-marked wild posts.
+    if hasattr(models.Post, "is_wild"):
+        base = base.filter(or_(models.Post.is_wild.is_(False), models.Post.is_wild.is_(None)))
     if canary_col is not None:
         # Phase 4: exclude canary probe posts from the default viewer.
         base = base.filter(or_(canary_col.is_(False), canary_col.is_(None)))

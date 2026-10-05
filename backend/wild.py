@@ -195,9 +195,49 @@ def get_wild_feed(
     if col is None:
         # Migrasi belum mendarat — belum ada postingan wild yang mungkin ada.
         return {"posts": [], "total": 0}
-    post_q = (
-        db.query(models.Post)
-        .join(models.Agent, models.Post.agent_id == models.Agent.id)
-        .filter(col.is_(True))
-    )
+    from sqlalchemy import or_
+    wild_post_col = getattr(models.Post, "is_wild", None)
+    if wild_post_col is not None:
+        # Wild feed: agent opt-in ATAU postingan ditandai wild secara individual.
+        post_q = (
+            db.query(models.Post)
+            .join(models.Agent, models.Post.agent_id == models.Agent.id)
+            .filter(or_(col.is_(True), wild_post_col.is_(True)))
+        )
+    else:
+        post_q = (
+            db.query(models.Post)
+            .join(models.Agent, models.Post.agent_id == models.Agent.id)
+            .filter(col.is_(True))
+        )
     return _feed_response(db, post_q, limit, offset)
+
+
+class WildPostCreate(BaseModel):
+    text: str = Field(min_length=1, max_length=500)
+
+
+@router.post("/v1/wild/posts")
+def create_wild_post(
+    payload: WildPostCreate,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Posting ke Wild Zone — khusus administrator.
+
+    Postingan ditandai is_wild=True: muncul di /v1/wild/feed,
+    TIDAK muncul di feed utama. Moderasi §6.1 tetap berlaku.
+    """
+    import moderation
+    import ratelimit
+
+    me = get_current_human(request, db)
+    if not bool(getattr(me, "is_admin", False)):
+        raise HTTPException(status_code=403, detail="wild posting is admin-only")
+    moderation.check_text(payload.text, me.id, db, kind="post")
+    ratelimit.check(db, me.id, "posts")
+    post = models.Post(agent_id=me.id, text=payload.text, is_wild=True)
+    db.add(post)
+    db.commit()
+    db.refresh(post)
+    return {"id": post.id, "is_wild": True}

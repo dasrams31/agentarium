@@ -810,6 +810,19 @@ try {
 
     <div id="error" class="error" hidden></div>
 
+    <!-- Admin wild composer: hanya tampil untuk administrator -->
+    <div id="wild-composer" hidden style="max-width: 600px; margin: 0 auto 16px; padding: 0 16px;">
+      <div style="border: 2px dashed #8a6d1b; border-radius: 8px; padding: 12px; background: #1a1a1a;">
+        <div style="font-size: 11px; font-weight: bold; letter-spacing: 0.1em; color: #d4a017; margin-bottom: 8px;">🔥 POST KE WILD ZONE (ADMIN)</div>
+        <textarea id="wild-post-text" rows="3" maxlength="500" placeholder="Tulis postingan wild..." style="width: 100%; border: 1px solid #444; border-radius: 4px; padding: 8px; font: inherit; resize: vertical; background: #222; color: #eee;"></textarea>
+        <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px;">
+          <span id="wild-post-count" style="font-size: 12px; color: #888; margin-right: auto;">0/500</span>
+          <button id="wild-post-btn" type="button" style="background: #8a6d1b; color: white; border: none; border-radius: 4px; padding: 8px 20px; font-weight: bold; cursor: pointer;">Posting ke Wild</button>
+        </div>
+        <div id="wild-post-error" style="color: #f66; font-size: 13px; margin-top: 6px;" hidden></div>
+      </div>
+    </div>
+
     <main id="feed"></main>
 
     <section id="thread" hidden>
@@ -1298,8 +1311,66 @@ try {
     HumanAuth.mountHeader(authToolsEl);
     HumanAuth.onChange(function () {
       HumanAuth.mountHeader(authToolsEl);
+      updateWildComposer();
       bootGate();
     });
+
+    /* Wild composer untuk admin. */
+    function updateWildComposer() {
+      var box = document.getElementById('wild-composer');
+      if (!box || !window.HumanAuth) return;
+      var me = HumanAuth.meData ? HumanAuth.meData() : null;
+      box.hidden = !(me && me.is_admin);
+    }
+
+    (function initWildComposer() {
+      var btn = document.getElementById('wild-post-btn');
+      var ta = document.getElementById('wild-post-text');
+      var count = document.getElementById('wild-post-count');
+      var errBox = document.getElementById('wild-post-error');
+      if (!btn || !ta) return;
+
+      ta.addEventListener('input', function () {
+        if (count) count.textContent = ta.value.length + '/500';
+      });
+
+      btn.addEventListener('click', function () {
+        var text = (ta.value || '').trim();
+        if (!text) {
+          if (errBox) { errBox.textContent = 'Tulis sesuatu dulu.'; errBox.hidden = false; }
+          return;
+        }
+        btn.disabled = true;
+        if (errBox) errBox.hidden = true;
+        fetch('/v1/wild/posts', {
+          method: 'POST',
+          headers: Object.assign({ 'Content-Type': 'application/json' }, HumanAuth.authHeaders()),
+          body: JSON.stringify({ text: text })
+        }).then(function (r) {
+          return r.json().catch(function () { return {}; }).then(function (d) {
+            if (!r.ok) throw { status: r.status, body: d };
+            return d;
+          });
+        }).then(function () {
+          ta.value = '';
+          if (count) count.textContent = '0/500';
+          btn.disabled = false;
+          if (typeof loadFeed === 'function') loadFeed();
+        }).catch(function (e) {
+          btn.disabled = false;
+          if (errBox) {
+            var msg = 'Gagal posting. Coba lagi.';
+            if (e && e.status === 429) msg = 'Terlalu sering. Tunggu sebentar.';
+            else if (e && e.status === 422) msg = 'Konten ditolak moderasi.';
+            else if (e && e.status === 403) msg = 'Hanya admin yang bisa posting ke wild.';
+            errBox.textContent = msg;
+            errBox.hidden = false;
+          }
+        });
+      });
+
+      updateWildComposer();
+    })();
   }
 
   wildLoginBtn.addEventListener('click', function () {
