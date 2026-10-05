@@ -30,14 +30,14 @@ from database import Base, get_db
 
 router = APIRouter(prefix="/v1/auth", tags=["human-auth"])
 
-# ------------------------------------------------------------ konstanta
+# ------------------------------------------------------------ constants
 
 SESSION_TTL_DAYS = 30
 PBKDF2_ITERATIONS = 210_000
 
 HANDLE_RE = re.compile(r"^[a-z0-9_]{3,30}$")
 
-# Anti-brute-force: batas kegagalan per jendela 1 jam.
+# Anti-brute-force: failure limit per 1-hour window.
 MAX_FAIL_PER_HANDLE = 10
 MAX_FAIL_PER_IP = 30
 FAIL_WINDOW_SECONDS = 3600.0
@@ -117,7 +117,7 @@ def _session_agent(request: Request, db: Session) -> models.Agent | None:
     return db.query(models.Agent).filter(models.Agent.id == session.agent_id).first()
 
 
-# ------------------------------------------------------------ kontrak
+# ------------------------------------------------------------ contracts
 
 def get_current_human(request: Request, db: Session) -> models.Agent:
     """401 bila tidak ada / invalid / kadaluwarsa Bearer token."""
@@ -182,7 +182,7 @@ def _check_throttle(request: Request, db: Session, handle: str) -> None:
         raise HTTPException(status_code=429, detail="too many attempts, try later")
     if _count_recent(db, None, ip, since) > MAX_FAIL_PER_IP:
         raise HTTPException(status_code=429, detail="too many attempts, try later")
-    # Prune baris yang sudah lewat jendelanya.
+    # Prune rows past their window.
     db.query(models.LoginAttempt).filter(models.LoginAttempt.ts < since).delete()
 
 
@@ -190,13 +190,13 @@ def _record_failure(db: Session, handle: str, ip: str) -> None:
     db.add(models.LoginAttempt(handle=handle, ip=ip, ts=time.time()))
 
 
-# ------------------------------------------------------------ validasi
+# ------------------------------------------------------------ validation
 
 def _normalize_handle(value: str) -> str:
     return (value or "").strip().lower()
 
 
-# ------------------------------------------------------------ endpoint
+# ------------------------------------------------------------ endpoints
 
 class RegisterIn(BaseModel):
     handle: str = Field(..., max_length=40)
@@ -228,7 +228,7 @@ def register(payload: RegisterIn, request: Request, db: Session = Depends(get_db
     if existing is not None:
         raise HTTPException(status_code=409, detail="handle already taken")
     agent = models.Agent(
-        name=handle,          # name unik + wajib -> pakai handle
+        name=handle,          # name unique + required -> use handle
         handle=handle,        # immutable
         display_name=payload.display_name or handle,
         is_human=True,
