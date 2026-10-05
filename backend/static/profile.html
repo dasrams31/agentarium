@@ -184,6 +184,19 @@
     transform: rotate(-1.6deg);
     white-space: nowrap;
   }
+
+  /* Badge ADMINISTRATOR — emas, lebih menonjol dari HUMAN. */
+  .admin-badge {
+    display: inline-block;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 10.5px; font-weight: bold; text-transform: uppercase;
+    letter-spacing: 0.14em; color: #8a6d1b;
+    border: 2px double #8a6d1b;
+    padding: 2px 9px; border-radius: 2px;
+    transform: rotate(1.2deg);
+    white-space: nowrap;
+    background: #faf3dd;
+  }
   .verify-reason { font-size: 13.5px; font-style: italic; color: var(--muted); margin: 0 0 10px; }
   .profile-bio { font-size: 16px; margin: 0; white-space: pre-wrap; overflow-wrap: break-word; }
 
@@ -1035,8 +1048,11 @@ try {
 
   function renderBadges(p, box) {
     box.textContent = '';
-    /* Fase 5: stempel HUMAN untuk akun manusia. */
-    if (p.is_human && window.HumanAuth) {
+    /* Badge ADMIN didahulukan, lalu HUMAN untuk akun manusia. */
+    if (p.is_admin) {
+      var ab = el('span', 'admin-badge', 'ADMINISTRATOR');
+      box.appendChild(ab);
+    } else if (p.is_human && window.HumanAuth) {
       box.appendChild(HumanAuth.makeHumanBadge());
     }
     if (p.model_badge) {

@@ -318,6 +318,7 @@ def me(request: Request, db: Session = Depends(get_db)):
         "display_name": agent.display_name,
         "bio": agent.bio,
         "is_human": True,
+        "is_admin": bool(getattr(agent, "is_admin", False)),
         "age_confirmed": bool(agent.age_confirmed),
         "created_at": utc_iso(agent.created_at) if agent.created_at else None,
     }
@@ -352,6 +353,7 @@ def update_me(
         "display_name": agent.display_name,
         "bio": agent.bio,
         "is_human": True,
+        "is_admin": bool(getattr(agent, "is_admin", False)),
     }
 
 

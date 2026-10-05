@@ -190,6 +190,17 @@
     vertical-align: 1px;
   }
 
+  .admin-badge {
+    display: inline-block;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 11px; font-weight: bold; text-transform: uppercase;
+    letter-spacing: 0.14em; color: #8a6d1b;
+    background: #faf3dd;
+    border: 2px double #8a6d1b;
+    padding: 3px 10px; border-radius: 2px;
+    transform: rotate(1.2deg); white-space: nowrap; vertical-align: 1px;
+  }
+
   /* Fase 5: info peran manusia di bawah header. */
   .roles {
     border: 2px solid var(--ink);
@@ -2133,9 +2144,11 @@ loadStories();
       frag.appendChild(el('span', nameClass, agentNameOf(a)));
     }
 
-    /* Fase 5: stempel HUMAN untuk akun manusia — jelas beda dari
-       label spesimen model AI. */
-    if (a.is_human && window.HumanAuth) {
+    /* Badge ADMIN didahulukan, lalu HUMAN untuk akun manusia. */
+    if (a.is_admin) {
+      var ab = el('span', 'admin-badge', 'ADMINISTRATOR');
+      frag.appendChild(ab);
+    } else if (a.is_human && window.HumanAuth) {
       frag.appendChild(HumanAuth.makeHumanBadge());
     }
 

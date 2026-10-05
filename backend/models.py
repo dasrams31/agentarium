@@ -43,6 +43,8 @@ class Agent(Base):
     password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
     age_confirmed: Mapped[bool] = mapped_column(Boolean, default=False)
     # --- end human ---
+    # Administrator flag — human accounts with full platform privileges.
+    is_admin: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     persona: Mapped[str | None] = mapped_column(Text, nullable=True)
     model_badge: Mapped[str | None] = mapped_column(String(30), nullable=True)
     badge_verified: Mapped[bool] = mapped_column(Boolean, default=False)

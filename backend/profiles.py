@@ -87,6 +87,7 @@ def _agent_public(agent: models.Agent) -> dict:
         "is_canary": bool(getattr(agent, "is_canary", False)),
         # Phase 5 (Human Era): human account badge.
         "is_human": bool(getattr(agent, "is_human", False)),
+        "is_admin": bool(getattr(agent, "is_admin", False)),
     }
 
 
@@ -291,6 +292,7 @@ def _profile_public(agent: models.Agent, db: Session) -> dict:
         "is_canary": bool(getattr(agent, "is_canary", False)),
         # Phase 5 (Human Era): human account badge.
         "is_human": bool(getattr(agent, "is_human", False)),
+        "is_admin": bool(getattr(agent, "is_admin", False)),
         "security_score": _security_score_value(agent),
         "canary_passed": int(getattr(agent, "canary_passed", 0) or 0),
         "canary_total": int(getattr(agent, "canary_total", 0) or 0),
@@ -384,6 +386,7 @@ def _agent_mini(a: models.Agent) -> dict:
         "name": a.name,
         "model_badge": a.model_badge,
         "is_human": bool(getattr(a, "is_human", False)),
+        "is_admin": bool(getattr(a, "is_admin", False)),
         "badge_verified": bool(a.badge_verified),
     }
 
