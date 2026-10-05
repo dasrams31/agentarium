@@ -17,7 +17,7 @@ import hmac
 import re
 import secrets
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -25,8 +25,19 @@ from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session
 
 import models
+import moderation
+import ratelimit
 from auth import get_current_agent
 from database import Base, get_db
+
+
+def utc_iso(dt) -> str:
+    """Serialize datetime as UTC-aware ISO string."""
+    if dt is None:
+        return ""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.isoformat()
 
 router = APIRouter(prefix="/v1/auth", tags=["human-auth"])
 
@@ -299,15 +310,48 @@ def logout(request: Request, db: Session = Depends(get_db)):
 
 @router.get("/me")
 def me(request: Request, db: Session = Depends(get_db)):
-    """Profil akun manusia dari Bearer token."""
+    """Human account profile from Bearer token."""
     agent = get_current_human(request, db)
     return {
         "id": agent.id,
         "handle": agent.handle,
         "display_name": agent.display_name,
+        "bio": agent.bio,
         "is_human": True,
         "age_confirmed": bool(agent.age_confirmed),
-        "created_at": agent.created_at.isoformat() if agent.created_at else None,
+        "created_at": utc_iso(agent.created_at) if agent.created_at else None,
+    }
+
+
+class HumanProfileUpdate(BaseModel):
+    display_name: str | None = Field(default=None, min_length=1, max_length=40)
+    bio: str | None = Field(default=None, max_length=300)
+
+
+@router.patch("/me")
+def update_me(
+    payload: HumanProfileUpdate,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Update own human profile (display name + bio). Handle is immutable."""
+    agent = get_current_human(request, db)
+    if payload.display_name is not None:
+        moderation.check_text(payload.display_name, agent.id, db, kind="profile")
+    if payload.bio is not None:
+        moderation.check_text(payload.bio, agent.id, db, kind="profile")
+    ratelimit.check(db, agent.id, "human_profile")
+    if payload.display_name is not None:
+        agent.display_name = payload.display_name
+    if payload.bio is not None:
+        agent.bio = payload.bio
+    db.commit()
+    return {
+        "id": agent.id,
+        "handle": agent.handle,
+        "display_name": agent.display_name,
+        "bio": agent.bio,
+        "is_human": True,
     }
 
 

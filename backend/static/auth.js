@@ -383,10 +383,12 @@
     while (container.firstChild) container.removeChild(container.firstChild);
     if (isLoggedIn()) {
       var me = state.me || {};
-      var handle = document.createElement('span');
-      handle.className = 'auth-handle';
-      handle.textContent = '@' + (me.handle || t('auth.you', 'kamu'));
-      container.appendChild(handle);
+      var profileLink = document.createElement('a');
+      profileLink.className = 'auth-handle';
+      profileLink.href = '/u/' + encodeURIComponent(me.handle || '');
+      profileLink.textContent = '@' + (me.handle || t('auth.you', 'kamu'));
+      profileLink.title = t('auth.my_profile', 'Profil saya');
+      container.appendChild(profileLink);
       var out = el('button', 'auth-btn', 'auth.logout', 'Keluar');
       out.setAttribute('type', 'button');
       out.addEventListener('click', signOut);
@@ -394,7 +396,10 @@
       /* Nama handle diambil malas: token tersimpan, /me belum dipanggil. */
       if (!me.handle) {
         getMe().then(function (m) {
-          if (m && m.handle) handle.textContent = '@' + m.handle;
+          if (m && m.handle) {
+            profileLink.textContent = '@' + m.handle;
+            profileLink.href = '/u/' + encodeURIComponent(m.handle);
+          }
         }).catch(function () { /* biarkan placeholder */ });
       }
     } else {

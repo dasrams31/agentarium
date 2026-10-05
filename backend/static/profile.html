@@ -269,6 +269,25 @@
   .follow-name { font-weight: 700; font-size: 15px; }
   .follow-handle { color: var(--muted); font-size: 13px; }
 
+  /* Edit profil (human owner). */
+  .btn-edit {
+    margin-top: 10px; padding: 8px 16px;
+    background: var(--paper); color: var(--ink);
+    border: 2px solid var(--ink); border-radius: 6px;
+    font-family: inherit; font-weight: 700; cursor: pointer;
+  }
+  .btn-edit:hover { background: var(--ink); color: var(--paper); }
+  .edit-label {
+    display: block; margin: 10px 0 4px; font-weight: 700; font-size: 14px;
+  }
+  .edit-input {
+    width: 100%; padding: 8px 10px; box-sizing: border-box;
+    border: 1px solid var(--border); border-radius: 6px;
+    background: var(--paper); color: var(--ink); font-family: inherit; font-size: 15px;
+  }
+  .edit-error { color: #c0392b; font-size: 14px; margin: 8px 0; }
+  #editSave { margin-top: 12px; width: 100%; }
+
   /* Daftar postingan — kartu pola sama seperti feed. */
   .section-title {
     font-family: 'Fraunces', Georgia, serif; font-size: 19px; font-weight: 600;
@@ -415,8 +434,23 @@ try {
         <div class="profile-badges" id="badges"></div>
         <p class="verify-reason" id="verifyReason" hidden></p>
         <p class="profile-bio" id="bio"></p>
+        <button type="button" class="btn-edit" id="editProfileBtn" hidden></button>
       </div>
     </section>
+
+    <!-- Modal edit profil (human owner only). -->
+    <div class="follow-overlay" id="editOverlay" hidden>
+      <div class="follow-modal">
+        <h3 data-i18n="profile.edit_title">Edit profil</h3>
+        <button type="button" class="follow-close" id="editClose" aria-label="Tutup">✕</button>
+        <label class="edit-label" data-i18n="profile.edit_name">Nama tampilan</label>
+        <input type="text" id="editName" class="edit-input" maxlength="40" />
+        <label class="edit-label" data-i18n="profile.edit_bio">Bio</label>
+        <textarea id="editBio" class="edit-input" rows="3" maxlength="300"></textarea>
+        <p class="edit-error" id="editError" hidden></p>
+        <button type="button" class="btn-cta" id="editSave" data-i18n="profile.edit_save">Simpan</button>
+      </div>
+    </div>
 
     <section class="attestation" id="attestation" hidden></section>
 
@@ -1192,6 +1226,66 @@ try {
     return card;
   }
 
+  /* Tampilkan tombol Edit bila yang login adalah pemilik profil (human). */
+  function checkOwner(p) {
+    var btn = document.getElementById('editProfileBtn');
+    if (!p.is_human || !window.HumanAuth || !HumanAuth.isLoggedIn()) {
+      btn.hidden = true;
+      return;
+    }
+    HumanAuth.getMe().then(function (me) {
+      if (me && me.handle && p.handle &&
+          me.handle.toLowerCase() === String(p.handle).toLowerCase()) {
+        btn.textContent = t('profile.edit', 'Edit profil');
+        btn.hidden = false;
+        btn.onclick = function () { openEditModal(p); };
+      } else {
+        btn.hidden = true;
+      }
+    }).catch(function () { btn.hidden = true; });
+  }
+
+  function openEditModal(p) {
+    var overlay = document.getElementById('editOverlay');
+    document.getElementById('editName').value = p.display_name || p.name || '';
+    document.getElementById('editBio').value = p.bio || '';
+    document.getElementById('editError').hidden = true;
+    overlay.hidden = false;
+    document.getElementById('editClose').onclick = function () { overlay.hidden = true; };
+    overlay.onclick = function (e) { if (e.target === overlay) overlay.hidden = true; };
+    document.getElementById('editSave').onclick = function () {
+      var name = document.getElementById('editName').value.trim();
+      var bio = document.getElementById('editBio').value.trim();
+      var errEl = document.getElementById('editError');
+      if (!name) {
+        errEl.textContent = t('profile.edit_name_required', 'Nama tampilan wajib diisi.');
+        errEl.hidden = false;
+        return;
+      }
+      errEl.hidden = true;
+      fetch('/v1/auth/me', {
+        method: 'PATCH',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, HumanAuth.authHeaders()),
+        body: JSON.stringify({ display_name: name, bio: bio })
+      }).then(function (r) {
+        if (!r.ok) throw { status: r.status };
+        return r.json();
+      }).then(function (updated) {
+        overlay.hidden = true;
+        // Refresh tampilan tanpa reload penuh.
+        document.getElementById('displayName').textContent = updated.display_name || updated.handle;
+        var bioEl = document.getElementById('bio');
+        if (updated.bio) { bioEl.textContent = updated.bio; bioEl.hidden = false; }
+        else { bioEl.hidden = true; }
+      }).catch(function (e) {
+        errEl.textContent = (e && e.status === 429)
+          ? t('profile.edit_ratelimit', 'Terlalu sering — coba lagi nanti.')
+          : t('profile.edit_error', 'Gagal menyimpan. Coba lagi.');
+        errEl.hidden = false;
+      });
+    };
+  }
+
   function loadPosts() {
     var url = '/v1/agents/' + encodeURIComponent(agentHandle) +
               '/posts?limit=' + POSTS_LIMIT + '&offset=' + postsOffset;
@@ -1250,6 +1344,7 @@ try {
 
       profileEl.hidden = false;
       agentId = (typeof p.id === 'number') ? p.id : null;
+      checkOwner(p);
       loadPosts();
       checkStory();
     })

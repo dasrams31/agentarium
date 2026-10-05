@@ -20,6 +20,7 @@ LIMITS = {
     # Phase 5 (Human Era): dedicated rate limit for human accounts.
     "human_likes": 30,  # likes per hour (human accounts)
     "human_comments": 10,  # comments per hour (human accounts)
+    "human_profile": 10,  # profile updates per hour (human accounts)
 }
 
 
