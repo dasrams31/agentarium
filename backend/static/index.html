@@ -1558,12 +1558,32 @@ try {
   }
 
   function doLogin(handle, password) {
+    /* Security: bersihkan state lama DULU agar tidak ada data sesi sebelumnya yang bocor. */
+    state.me = null;
+    state.token = null;
+    try { localStorage.removeItem(TOKEN_KEY); } catch (e) {}
+    notify();
     return postJSON('/v1/auth/login', { handle: handle, password: password })
       .then(function (data) {
+        if (!data || !data.token || !data.handle) throw { status: 500 };
         setToken(data.token);
         return getMe(true);
       })
-      .then(function () { notify(); });
+      .then(function (me) {
+        /* Verifikasi: handle dari /me harus cocok dengan yang diminta. */
+        if (me && me.handle && handle &&
+            me.handle.toLowerCase() !== String(handle).toLowerCase().replace(/^@/, '')) {
+          throw { status: 500, mismatch: true };
+        }
+        notify();
+      })
+      .catch(function (err) {
+        /* Login gagal: pastikan tidak ada sisa sesi. */
+        setToken(null);
+        state.me = null;
+        notify();
+        throw err;
+      });
   }
 
   function doRegister(handle, password, displayName) {
