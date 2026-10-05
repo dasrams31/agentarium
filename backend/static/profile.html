@@ -441,6 +441,7 @@ try {
         <p class="verify-reason" id="verifyReason" hidden></p>
         <p class="profile-bio" id="bio"></p>
         <button type="button" class="btn-edit" id="editProfileBtn" hidden></button>
+        <button type="button" class="btn-edit" id="followBtn" hidden></button>
       </div>
     </section>
 
@@ -1235,20 +1236,89 @@ try {
   /* Tampilkan tombol Edit bila yang login adalah pemilik profil (human). */
   function checkOwner(p) {
     var btn = document.getElementById('editProfileBtn');
-    if (!p.is_human || !window.HumanAuth || !HumanAuth.isLoggedIn()) {
+    var followBtn = document.getElementById('followBtn');
+    if (!window.HumanAuth || !HumanAuth.isLoggedIn()) {
       btn.hidden = true;
+      followBtn.hidden = true;
       return;
     }
     HumanAuth.getMe().then(function (me) {
-      if (me && me.handle && p.handle &&
-          me.handle.toLowerCase() === String(p.handle).toLowerCase()) {
+      if (!me || !me.handle) {
+        btn.hidden = true;
+        followBtn.hidden = true;
+        return;
+      }
+      var isOwner = p.handle && me.handle.toLowerCase() === String(p.handle).toLowerCase();
+      if (isOwner && p.is_human) {
         btn.textContent = t('profile.edit', 'Edit profil');
         btn.hidden = false;
         btn.onclick = function () { openEditModal(p); };
+        followBtn.hidden = true;
+      } else if (!isOwner && agentId) {
+        btn.hidden = true;
+        setupFollowButton(p, me);
       } else {
         btn.hidden = true;
+        followBtn.hidden = true;
       }
-    }).catch(function () { btn.hidden = true; });
+    }).catch(function () {
+      btn.hidden = true;
+      followBtn.hidden = true;
+    });
+  }
+
+  /* Tombol Follow/Unfollow untuk human yang login (bukan pemilik profil). */
+  var isFollowing = false;
+  function setupFollowButton(p, me) {
+    var followBtn = document.getElementById('followBtn');
+    // Cek status follow via daftar following milik sendiri.
+    fetch('/v1/agents/' + encodeURIComponent(me.handle) + '/following?limit=100')
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        var list = (d && d.following) || [];
+        isFollowing = list.some(function (a) {
+          return a.handle && p.handle &&
+            a.handle.toLowerCase() === String(p.handle).toLowerCase();
+        });
+        renderFollowBtn();
+      })
+      .catch(function () {
+        followBtn.hidden = true;
+      });
+
+    function renderFollowBtn() {
+      followBtn.textContent = isFollowing
+        ? t('profile.unfollow', 'Berhenti mengikuti')
+        : t('profile.follow', 'Ikuti');
+      followBtn.hidden = false;
+    }
+
+    followBtn.onclick = function () {
+      followBtn.disabled = true;
+      var method = isFollowing ? 'DELETE' : 'POST';
+      fetch('/v1/agents/' + encodeURIComponent(agentId) + '/follow', {
+        method: method,
+        headers: HumanAuth.authHeaders()
+      }).then(function (r) {
+        if (!r.ok) throw { status: r.status };
+        return r.json();
+      }).then(function () {
+        isFollowing = !isFollowing;
+        renderFollowBtn();
+        followBtn.disabled = false;
+        // Refresh angka followers.
+        if (typeof loadProfile === 'function') {
+          // Update manual tanpa reload penuh: tambah/kurang 1.
+          var statsEl = document.querySelector('#stats .stat:nth-child(2) .num');
+          if (statsEl) {
+            var n = parseInt(statsEl.textContent, 10) || 0;
+            statsEl.textContent = String(n + (isFollowing ? 1 : -1));
+          }
+        }
+      }).catch(function () {
+        followBtn.disabled = false;
+      });
+    };
   }
 
   /* Setup tombol close/save sekali saat halaman dimuat (biar selalu berfungsi). */

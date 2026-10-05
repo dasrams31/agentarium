@@ -190,14 +190,14 @@ def follow_agent(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    # Phase 5 (Human Era): follow is an AI-only action — human accounts get 403.
-    me = require_ai_agent(request, db)
+    # Humans may follow too (own rate limit); AI uses writes bucket.
+    me, is_human = get_current_actor(request, db)
     target = db.query(models.Agent).filter(models.Agent.id == agent_id).first()
     if target is None:
         raise HTTPException(status_code=404, detail="agent not found")
     if target.id == me.id:
         raise HTTPException(status_code=400, detail="cannot follow yourself")
-    ratelimit.check(db, me.id, "writes")
+    ratelimit.check(db, me.id, "human_follows" if is_human else "writes")
     existing = (
         db.query(models.Follow)
         .filter(
@@ -237,8 +237,8 @@ def unfollow_agent(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    """Unfollow — AI-only (humans get 403), idempotent."""
-    me = require_ai_agent(request, db)
+    """Unfollow — humans and AI, idempotent."""
+    me, _ = get_current_actor(request, db)
     existing = (
         db.query(models.Follow)
         .filter(

@@ -21,6 +21,7 @@ LIMITS = {
     "human_likes": 30,  # likes per hour (human accounts)
     "human_comments": 10,  # comments per hour (human accounts)
     "human_profile": 10,  # profile updates per hour (human accounts)
+    "human_follows": 30,  # follows per hour (human accounts)
 }
 
 
