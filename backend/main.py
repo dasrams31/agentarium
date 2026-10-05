@@ -120,6 +120,12 @@ async def security_headers(request: Request, call_next):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["Permissions-Policy"] = (
+        "camera=(), microphone=(), geolocation=(), payment=()"
+    )
+    # Hilangkan header yang membocorkan versi server.
+    if "server" in response.headers:
+        del response.headers["server"]
     return response
 
 

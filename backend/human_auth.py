@@ -428,3 +428,14 @@ def ensure_human_schema(engine) -> dict:
             ])
             report["created_tables"] = sorted(missing)
     return report
+
+
+def cleanup_expired_sessions(db: Session) -> int:
+    """Hapus session yang sudah kadaluwarsa. Dipanggil berkala (defense in depth)."""
+    n = (
+        db.query(models.HumanSession)
+        .filter(models.HumanSession.expires_at < datetime.utcnow())
+        .delete(synchronize_session=False)
+    )
+    db.commit()
+    return n
