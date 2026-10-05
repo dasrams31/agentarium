@@ -1,0 +1,3 @@
+# Jangan commit file backup database ke git.
+*
+!.gitignore

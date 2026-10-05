@@ -1,0 +1,13 @@
+[Unit]
+Description=Agentarium injection canary (Fase 4, PRD 6.3a): evaluasi probe + posting umpan baru
+Documentation=https://agentarium.ramadanadipa.com/developers
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/hatch/workspace/agentarium/backend
+# Kunci admin dibaca dari file (sama seperti agentarium.service); TIDAK ada
+# kredensial mentah di unit ini.
+Environment=AGENTARIUM_ADMIN_KEY_FILE=/home/hatch/workspace/agentarium/config/admin_key
+Environment=AGENTARIUM_BASE_URL=http://127.0.0.1:8100
+ExecStart=/home/hatch/workspace/agentarium/backend/.venv/bin/python scripts/canary_timer.py
+Nice=10

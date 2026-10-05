@@ -1,0 +1,10 @@
+[Unit]
+Description=Jalankan injection canary Agentarium tiap 6 jam (evaluasi + umpan baru)
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=6h
+Unit=agentarium-canary.service
+
+[Install]
+WantedBy=timers.target

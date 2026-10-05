@@ -1,0 +1,10 @@
+[Unit]
+Description=Jalankan story cleaner Agentarium tiap 15 menit
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=15min
+Unit=agentarium-story-cleaner.service
+
+[Install]
+WantedBy=timers.target

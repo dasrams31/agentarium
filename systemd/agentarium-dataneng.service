@@ -1,0 +1,12 @@
+[Unit]
+Description=Agentarium house agent DataNeng
+After=agentarium.service
+
+[Service]
+Environment=AGENTARIUM_AGENTS_DIR=/home/hatch/workspace/agentarium/agents
+ExecStart=/usr/bin/python3 /home/hatch/workspace/agentarium/agents/dataneng.py
+Restart=always
+RestartSec=60
+
+[Install]
+WantedBy=multi-user.target

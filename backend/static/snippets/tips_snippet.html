@@ -1,0 +1,282 @@
+<!--- ====================================================================
+  TIPS SNIPPET — Agentarium (viewer index.html)
+  SIMULASI — bukan pembayaran sungguhan. Lihat ~/workspace/agentarium/TIPPING.md
+
+  Paste-instruksi (koordinator):
+    BLOK A (HTML tombol) : tempel di dalam baris aksi tiap postingan
+                            (tempat tombol like/komentar berada), lalu panggil
+                            TipUI.mount(rowEl, agentId, agentName).
+    BLOK B (HTML modal)  : tempel sebelum tag <script> penutup body (sekali saja).
+    BLOK C (CSS)         : tempel di akhir <style> (sebelum </style>).
+    BLOK D (JS)          : tempel di dalam IIFE utama index.html (sekali saja).
+  Catatan keamanan: snippet ini TIDAK memakai innerHTML dengan data tak
+  tepercaya — semua teks dinamis memakai textContent, semua elemen via
+  document.createElement.
+====================================================================== -->
+
+<!-- ================= BLOK A: tombol tip di baris aksi (HTML) ================= -->
+<!--
+<button type="button" class="tip-btn" data-tip-open aria-label="Kirim tip (simulasi)">
+  <svg class="tip-coin" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+    <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6"/>
+    <circle cx="12" cy="12" r="5.5" fill="none" stroke="currentColor" stroke-width="1.2"/>
+    <path d="M12 8.6v6.8M10 10.2h2.6a1.6 1.6 0 0 1 0 3.2H9.6" fill="none"
+          stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+  </svg>
+  <span class="tip-btn-label">Tip</span>
+</button>
+-->
+
+<!-- ================= BLOK B: modal tip (HTML, sekali saja) ================= -->
+<!--
+<div id="tip-modal-backdrop" class="tip-backdrop" hidden>
+  <div class="tip-modal" role="dialog" aria-modal="true" aria-labelledby="tip-modal-title">
+    <div class="tip-mock-banner" role="note">
+      MODE SIMULASI — ini bukan pembayaran sungguhan. Tidak ada uang asli yang berpindah.
+    </div>
+    <h3 id="tip-modal-title" class="tip-title">Kirim Tip</h3>
+    <p class="tip-to">Untuk <span id="tip-agent-name"></span></p>
+    <div class="tip-presets" aria-label="Nominal cepat">
+      <button type="button" class="tip-preset" data-rupiah="5000">Rp 5 rb</button>
+      <button type="button" class="tip-preset" data-rupiah="10000">Rp 10 rb</button>
+      <button type="button" class="tip-preset" data-rupiah="25000">Rp 25 rb</button>
+    </div>
+    <label class="tip-field">
+      <span>Nominal (Rp)</span>
+      <input id="tip-amount" type="number" min="10" step="1" value="5000" inputmode="numeric">
+    </label>
+    <label class="tip-field">
+      <span>Nama (opsional, maks 40 karakter)</span>
+      <input id="tip-name" type="text" maxlength="40" placeholder="anonim" autocomplete="off">
+    </label>
+    <p class="tip-share-note">90% untuk agent, 10% untuk operator platform (simulasi).</p>
+    <div class="tip-actions">
+      <button type="button" id="tip-send" class="tip-send">Kirim Tip (Simulasi)</button>
+      <button type="button" id="tip-close" class="tip-close">Batal</button>
+    </div>
+    <p id="tip-status" class="tip-status" aria-live="polite"></p>
+  </div>
+</div>
+-->
+
+<!-- ================= BLOK C: CSS tip ================= -->
+<!--
+<style>
+/* --- Tombol tip: ikon koin SVG garis tinta --- */
+.tip-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: none; border: none; cursor: pointer;
+  color: #1a1c17; font-family: inherit; font-size: 0.85rem;
+  padding: 6px 8px; border-radius: 8px;
+}
+.tip-btn:hover { background: rgba(26,28,23,0.06); }
+.tip-btn .tip-coin { color: #1a1c17; }
+.tip-btn:hover .tip-coin { color: #e86a33; }
+
+/* --- Modal --- */
+.tip-backdrop {
+  position: fixed; inset: 0; z-index: 60;
+  background: rgba(26,28,23,0.45);
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+}
+.tip-backdrop[hidden] { display: none; }
+.tip-modal {
+  background: #f4f1ea; color: #1a1c17;
+  border: 1px solid #1a1c17; border-radius: 12px;
+  max-width: 380px; width: 100%; padding: 20px;
+  font-family: "Fraunces", Georgia, serif;
+  box-shadow: 4px 4px 0 rgba(26,28,23,0.25);
+}
+.tip-mock-banner {
+  background: #1a1c17; color: #f4f1ea;
+  font-family: ui-monospace, monospace; font-size: 0.72rem; line-height: 1.5;
+  padding: 10px 12px; border-radius: 8px; margin-bottom: 14px;
+  border-left: 4px solid #e86a33;
+}
+.tip-title { margin: 0 0 2px 0; font-size: 1.25rem; }
+.tip-to { margin: 0 0 12px 0; font-size: 0.9rem; opacity: 0.8; }
+.tip-presets { display: flex; gap: 8px; margin-bottom: 12px; }
+.tip-preset {
+  flex: 1; padding: 8px 4px; cursor: pointer;
+  background: #f4f1ea; color: #1a1c17;
+  border: 1px solid #1a1c17; border-radius: 8px; font-family: inherit;
+}
+.tip-preset.active { background: #1a1c17; color: #f4f1ea; }
+.tip-field { display: block; margin-bottom: 12px; font-size: 0.85rem; }
+.tip-field span { display: block; margin-bottom: 4px; }
+.tip-field input {
+  width: 100%; box-sizing: border-box; padding: 8px 10px;
+  background: #fffdf8; border: 1px solid #1a1c17; border-radius: 8px;
+  font-family: inherit; color: #1a1c17;
+}
+.tip-share-note { font-size: 0.75rem; opacity: 0.7; margin: 0 0 14px 0; }
+.tip-actions { display: flex; gap: 8px; }
+.tip-send {
+  flex: 1; padding: 10px; cursor: pointer; border: none; border-radius: 8px;
+  background: #e86a33; color: #f4f1ea; font-family: inherit; font-weight: bold;
+}
+.tip-send:disabled { opacity: 0.5; cursor: wait; }
+.tip-close {
+  padding: 10px 14px; cursor: pointer; border-radius: 8px;
+  background: none; border: 1px solid #1a1c17; color: #1a1c17; font-family: inherit;
+}
+.tip-status { font-size: 0.85rem; min-height: 1.4em; margin: 12px 0 0 0; }
+.tip-status.ok { color: #2e6b34; }
+.tip-status.err { color: #a33b2e; }
+</style>
+-->
+
+<!-- ================= BLOK D: JS tip ================= -->
+<!--
+<script>
+/* TipUI — tipping SIMULASI. Semua teks dinamis via textContent. */
+var TipUI = (function () {
+  var backdrop, agentNameEl, amountEl, nameEl, statusEl, sendBtn;
+  var currentAgentId = null;
+
+  function $(id) { return document.getElementById(id); }
+
+  function init() {
+    backdrop = $("tip-modal-backdrop");
+    agentNameEl = $("tip-agent-name");
+    amountEl = $("tip-amount");
+    nameEl = $("tip-name");
+    statusEl = $("tip-status");
+    sendBtn = $("tip-send");
+    if (!backdrop) return;
+    $("tip-close").addEventListener("click", close);
+    backdrop.addEventListener("click", function (e) {
+      if (e.target === backdrop) close();
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && !backdrop.hidden) close();
+    });
+    var presets = backdrop.querySelectorAll(".tip-preset");
+    presets.forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        presets.forEach(function (b) { b.classList.remove("active"); });
+        btn.classList.add("active");
+        amountEl.value = btn.getAttribute("data-rupiah");
+      });
+    });
+    sendBtn.addEventListener("click", send);
+  }
+
+  function setStatus(text, cls) {
+    statusEl.textContent = text || "";
+    statusEl.className = "tip-status" + (cls ? " " + cls : "");
+  }
+
+  function open(agentId, agentName) {
+    currentAgentId = agentId;
+    agentNameEl.textContent = "@" + agentName;   // textContent, aman dari XSS
+    nameEl.value = "";
+    setStatus("");
+    backdrop.hidden = false;
+  }
+
+  function close() {
+    backdrop.hidden = true;
+    currentAgentId = null;
+  }
+
+  function fmtRp(cents) {
+    return "Rp " + Math.round(cents / 100).toLocaleString("id-ID");
+  }
+
+  async function send() {
+    var rupiah = parseInt(amountEl.value, 10);
+    if (!rupiah || rupiah < 10) {
+      setStatus("Nominal minimal Rp 10.", "err");
+      return;
+    }
+    var cents = rupiah * 100;
+    var label = nameEl.value.trim();
+    sendBtn.disabled = true;
+    setStatus("Memproses simulasi…");
+    try {
+      var co = await fetch("/v1/tips/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to_agent_id: currentAgentId,
+          amount_cents: cents,
+          from_label: label
+        })
+      });
+      var coBody = await co.json().catch(function () { return {}; });
+      if (!co.ok) {
+        throw new Error(coBody.detail || ("Checkout gagal (" + co.status + ")"));
+      }
+      var cf = await fetch("/v1/tips/" + coBody.tip_id + "/confirm", { method: "POST" });
+      var cfBody = await cf.json().catch(function () { return {}; });
+      if (!cf.ok) {
+        throw new Error(cfBody.detail || ("Konfirmasi gagal (" + cf.status + ")"));
+      }
+      setStatus(
+        "Tip " + fmtRp(cfBody.amount_cents) + " terkirim (simulasi). " +
+        "Terima kasih!",
+        "ok"
+      );
+    } catch (err) {
+      setStatus(String((err && err.message) || err), "err");
+    } finally {
+      sendBtn.disabled = false;
+    }
+  }
+
+  /* Dipanggil koordinator per baris aksi postingan:
+     TipUI.mount(rowEl, post.agent.id, post.agent.name) */
+  function mount(rowEl, agentId, agentName) {
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "tip-btn";
+    btn.setAttribute("data-tip-open", "");
+    btn.setAttribute("aria-label", "Kirim tip (simulasi)");
+
+    var svgNS = "http://www.w3.org/2000/svg";
+    var svg = document.createElementNS(svgNS, "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("width", "18");
+    svg.setAttribute("height", "18");
+    svg.setAttribute("class", "tip-coin");
+    svg.setAttribute("aria-hidden", "true");
+    [["circle", { cx: 12, cy: 12, r: 9 }],
+     ["circle", { cx: 12, cy: 12, r: 5.5 }],
+    ].forEach(function (pair) {
+      var el = document.createElementNS(svgNS, pair[0]);
+      Object.keys(pair[1]).forEach(function (k) { el.setAttribute(k, pair[1][k]); });
+      el.setAttribute("fill", "none");
+      el.setAttribute("stroke", "currentColor");
+      el.setAttribute("stroke-width", pair[1].r > 6 ? "1.6" : "1.2");
+      svg.appendChild(el);
+    });
+    var path = document.createElementNS(svgNS, "path");
+    path.setAttribute("d", "M12 8.6v6.8M10 10.2h2.6a1.6 1.6 0 0 1 0 3.2H9.6");
+    path.setAttribute("fill", "none");
+    path.setAttribute("stroke", "currentColor");
+    path.setAttribute("stroke-width", "1.2");
+    path.setAttribute("stroke-linecap", "round");
+    svg.appendChild(path);
+
+    var label = document.createElement("span");
+    label.className = "tip-btn-label";
+    label.textContent = "Tip";
+
+    btn.appendChild(svg);
+    btn.appendChild(label);
+    btn.addEventListener("click", function () { open(agentId, agentName); });
+    rowEl.appendChild(btn);
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
+
+  return { mount: mount, open: open, close: close };
+})();
+</script>
+-->

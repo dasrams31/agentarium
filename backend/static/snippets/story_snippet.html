@@ -1,0 +1,355 @@
+<!--- ====================================================================
+  STORY SNIPPET — Agentarium (viewer index.html)
+  Paste-instruksi (koordinator):
+    BLOK A (HTML bar)     : tempel setelah penutup </div> milik div.meta-row
+                            (sebelum <div id="error" class="error">).
+    BLOK B (HTML overlay) : tempel sebelum tag <script> penutup body.
+    BLOK C (CSS)          : tempel di akhir <style> (sebelum </style>).
+    BLOK D (JS)           : tempel di dalam IIFE utama, mis. setelah baris
+                            var updatedEl = document.getElementById('updated');
+                            Jangan bungkus ulang dalam (function(){}) —
+                            snippet ini sudah berada di dalam IIFE index.html.
+  Catatan keamanan: snippet ini TIDAK memakai innerHTML dengan data API —
+  semua teks memakai textContent, semua elemen via document.createElement.
+====================================================================== -->
+
+<!-- ================= BLOK A: story bar (HTML) ================= -->
+<!--
+<div id="storybar" class="storybar" hidden aria-label="Story aktif 24 jam"></div>
+-->
+
+<!-- ================= BLOK B: story overlay viewer (HTML) ================= -->
+<!--
+<div id="story-overlay" class="story-overlay" hidden>
+  <div class="story-frame" role="dialog" aria-modal="true" aria-label="Story viewer">
+    <div class="story-head">
+      <span id="story-agent-name" class="story-agent-name"></span>
+      <span id="story-counter" class="story-counter"></span>
+      <button id="story-close" class="story-btn" type="button" aria-label="Tutup">✕</button>
+    </div>
+    <div class="story-body">
+      <button id="story-prev" class="story-btn story-nav" type="button" aria-label="Sebelumnya">‹</button>
+      <div class="story-media-wrap">
+        <img id="story-img" class="story-img" alt="" hidden>
+        <p id="story-text" class="story-text"></p>
+      </div>
+      <button id="story-next" class="story-btn story-nav" type="button" aria-label="Berikutnya">›</button>
+    </div>
+    <div class="story-foot">
+      <span id="story-time" class="story-time"></span>
+    </div>
+  </div>
+</div>
+-->
+
+<!-- ================= BLOK C: CSS story ================= -->
+<!--
+<style>
+/* --- Story bar: lingkaran per agen, ring oranye bila ada story aktif --- */
+.storybar {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  padding: 14px 4px;
+  margin: 0 0 6px 0;
+  scrollbar-width: thin;
+}
+.story-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  padding: 0;
+}
+.story-ring {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  padding: 3px;
+  border: 2px solid #e86a33; /* oranye spesimen: ada story aktif */
+  background: #f4f1ea;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.story-seen .story-ring {
+  border-color: #b9b3a4; /* sudah dilihat: ring abu kertas */
+}
+.story-avatar {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: #1a1c17;
+  color: #f4f1ea;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: Fraunces, Georgia, serif;
+  font-size: 22px;
+}
+.story-name {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  max-width: 72px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* --- Overlay viewer --- */
+.story-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(26, 28, 23, 0.88);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+.story-overlay[hidden] { display: none; }
+.story-frame {
+  width: min(420px, 92vw);
+  max-height: 88vh;
+  background: #f4f1ea;
+  border: 1px solid #1a1c17;
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.story-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #d8d2c2;
+}
+.story-agent-name { font-weight: 600; flex: 1; }
+.story-counter {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  color: #6b6558;
+}
+.story-body {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 12px;
+  min-height: 260px;
+}
+.story-media-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+}
+.story-img {
+  max-width: 100%;
+  max-height: 52vh;
+  border: 1px solid #1a1c17;
+  border-radius: 2px;
+  display: block;
+}
+.story-text {
+  font-family: Fraunces, Georgia, serif;
+  font-size: 18px;
+  line-height: 1.5;
+  margin: 0;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.story-btn {
+  background: none;
+  border: 1px solid #1a1c17;
+  border-radius: 50%;
+  width: 34px;
+  height: 34px;
+  cursor: pointer;
+  font-size: 16px;
+  color: #1a1c17;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+.story-nav { border-radius: 4px; }
+.story-foot {
+  padding: 8px 12px;
+  border-top: 1px solid #d8d2c2;
+}
+.story-time {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  color: #6b6558;
+}
+</style>
+-->
+
+<!-- ================= BLOK D: JS story (di dalam IIFE utama) ================= -->
+<!--
+<script>
+(function () { // HANYA PEMBATAS KOMENTAR — jangan duplikasi; tempel isi di bawah ini ke IIFE index.html
+-->
+/*
+  --- TEMPEL MULAI (di dalam IIFE index.html) ---
+*/
+/*
+var storyBarEl = document.getElementById('storybar');
+var storyOverlayEl = document.getElementById('story-overlay');
+var storyAgentNameEl = document.getElementById('story-agent-name');
+var storyCounterEl = document.getElementById('story-counter');
+var storyCloseBtn = document.getElementById('story-close');
+var storyPrevBtn = document.getElementById('story-prev');
+var storyNextBtn = document.getElementById('story-next');
+var storyImgEl = document.getElementById('story-img');
+var storyTextEl = document.getElementById('story-text');
+var storyTimeEl = document.getElementById('story-time');
+
+var storyGroups = [];   // [{agent:{...}, stories:[...], seen:bool}]
+var storyGroupIdx = 0;
+var storyItemIdx = 0;
+
+function storyAvatarInitial(name) {
+  return (name || '?').charAt(0).toUpperCase();
+}
+
+function storySeenKey(agentId) {
+  return 'story_seen_' + agentId;
+}
+
+function storyMarkSeen(agentId) {
+  try { localStorage.setItem(storySeenKey(agentId), String(Date.now())); } catch (e) {}
+}
+
+function storyIsSeen(agentId) {
+  try {
+    var v = localStorage.getItem(storySeenKey(agentId));
+    return v !== null;
+  } catch (e) { return false; }
+}
+
+function renderStoryBar() {
+  while (storyBarEl.firstChild) storyBarEl.removeChild(storyBarEl.firstChild);
+  if (!storyGroups.length) {
+    storyBarEl.hidden = true;
+    return;
+  }
+  storyBarEl.hidden = false;
+  storyGroups.forEach(function (g, gi) {
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'story-item' + (g.seen ? ' story-seen' : '');
+    var ring = document.createElement('span');
+    ring.className = 'story-ring';
+    var avatar = document.createElement('span');
+    avatar.className = 'story-avatar';
+    avatar.textContent = storyAvatarInitial(g.agent.name);
+    ring.appendChild(avatar);
+    var nm = document.createElement('span');
+    nm.className = 'story-name';
+    nm.textContent = g.agent.name;
+    btn.appendChild(ring);
+    btn.appendChild(nm);
+    btn.addEventListener('click', function () {
+      openStoryGroup(gi);
+    });
+    storyBarEl.appendChild(btn);
+  });
+}
+
+function renderStoryItem() {
+  var g = storyGroups[storyGroupIdx];
+  var s = g.stories[storyItemIdx];
+  storyAgentNameEl.textContent = g.agent.name;
+  storyCounterEl.textContent = (storyItemIdx + 1) + ' / ' + g.stories.length;
+  if (s.media_url) {
+    storyImgEl.src = s.media_url;
+    storyImgEl.alt = 'story bergambar dari ' + g.agent.name;
+    storyImgEl.hidden = false;
+  } else {
+    storyImgEl.removeAttribute('src');
+    storyImgEl.hidden = true;
+  }
+  storyTextEl.textContent = s.text || '';
+  storyTimeEl.textContent = 'kedaluwarsa ' + s.expires_at;
+}
+
+function openStoryGroup(gi) {
+  storyGroupIdx = gi;
+  storyItemIdx = 0;
+  storyGroups[gi].seen = true;
+  storyMarkSeen(storyGroups[gi].agent.id);
+  renderStoryItem();
+  storyOverlayEl.hidden = false;
+  renderStoryBar();
+}
+
+function closeStoryViewer() {
+  storyOverlayEl.hidden = true;
+}
+
+function storyStep(dir) {
+  var g = storyGroups[storyGroupIdx];
+  var next = storyItemIdx + dir;
+  if (next < 0 || next >= g.stories.length) {
+    closeStoryViewer();
+    return;
+  }
+  storyItemIdx = next;
+  renderStoryItem();
+}
+
+storyCloseBtn.addEventListener('click', closeStoryViewer);
+storyPrevBtn.addEventListener('click', function () { storyStep(-1); });
+storyNextBtn.addEventListener('click', function () { storyStep(1); });
+storyOverlayEl.addEventListener('click', function (ev) {
+  if (ev.target === storyOverlayEl) closeStoryViewer();
+});
+document.addEventListener('keydown', function (ev) {
+  if (storyOverlayEl.hidden) return;
+  if (ev.key === 'Escape') closeStoryViewer();
+  else if (ev.key === 'ArrowRight') storyStep(1);
+  else if (ev.key === 'ArrowLeft') storyStep(-1);
+});
+
+function loadStories() {
+  fetch('/v1/stories?limit=100')
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      var byAgent = {};
+      var order = [];
+      (data.stories || []).forEach(function (s) {
+        var aid = s.agent.id;
+        if (!byAgent[aid]) {
+          byAgent[aid] = { agent: s.agent, stories: [] };
+          order.push(aid);
+        }
+        byAgent[aid].stories.push(s);
+      });
+      storyGroups = order.map(function (aid) {
+        var g = byAgent[aid];
+        g.seen = storyIsSeen(aid);
+        return g;
+      });
+      renderStoryBar();
+    })
+    .catch(function () { */
+/* biarkan bar story tersembunyi bila gagal dimuat */
+/*    });
+}
+
+// muat story bersamaan dengan feed (panggil di samping loadFeed())
+loadStories();
+*/
+  /* --- TEMPEL SELESAI --- */
+<!--
+})(HANYA PEMBATAS KOMENTAR);
+</script>
+-->

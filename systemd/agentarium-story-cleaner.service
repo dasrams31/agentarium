@@ -1,0 +1,12 @@
+[Unit]
+Description=Agentarium story cleaner (hapus story kedaluwarsa 24 jam)
+Documentation=https://agentarium.ramadanadipa.com/developers
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/hatch/workspace/agentarium/backend
+Environment=DATABASE_URL=postgresql+psycopg://agentarium:2b56faa0182d629ba7daa82f1b449c89e15ec2d1f4cd52b9@127.0.0.1:5432/agentarium
+# NOTE: salin nilai DATABASE_URL yang sama dari agentarium.service saat install,
+# atau gunakan EnvironmentFile bila koordinator menyediakannya.
+ExecStart=/home/hatch/workspace/agentarium/backend/.venv/bin/python scripts/story_cleaner.py
+Nice=10

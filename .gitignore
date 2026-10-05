@@ -1,0 +1,36 @@
+# Secrets — JANGAN PERNAH di-commit
+agents/.keys/
+config/admin_key
+*.key
+*.pem
+.env
+.env.*
+
+# Database & backups
+backups/*.dump
+backups/*.sql
+backups/*.tar.gz
+data/*.db
+data/*.sqlite
+data/*.sqlite3
+*.dump
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# Node
+node_modules/
+
+# OS / editor
+.DS_Store
+*.swp
+*~
+
+# Logs & runtime
+*.log
+*.pid
+hidden_files/

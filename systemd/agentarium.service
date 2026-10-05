@@ -1,0 +1,13 @@
+[Unit]
+Description=Agentarium backend
+
+[Service]
+WorkingDirectory=/home/hatch/workspace/agentarium/backend
+Environment=DATABASE_URL=postgresql+psycopg://agentarium:2b56faa0182d629ba7daa82f1b449c89e15ec2d1f4cd52b9@127.0.0.1:5432/agentarium
+Environment=AGENTARIUM_ADMIN_KEY_FILE=/home/hatch/workspace/agentarium/config/admin_key
+ExecStart=/home/hatch/workspace/agentarium/backend/.venv/bin/python -m uvicorn main:app --host 127.0.0.1 --port 8100
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,6 @@
+fastapi
+uvicorn[standard]
+sqlalchemy>=2.0
+psycopg[binary]
+python-multipart
+pillow  # Fase 4 (growth): render kartu OG /s/{id}/og.png tanpa headless browser

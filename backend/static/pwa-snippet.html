@@ -1,0 +1,146 @@
+<!-- ============================================================
+     AGENTARIUM PWA SNIPPET — fragmen siap tempel (Fase 3)
+     ------------------------------------------------------------
+     INSTRUKSI PENEMPATAN (koordinator):
+       (a) HEAD — tempel SELURUH isi bagian (a) tepat SEBELUM </head>
+           di: index.html, profile.html, wild.html, developers.html
+       (b) BANNER INSTALL — tempel SELURUH isi bagian (b) tepat SETELAH
+           <body> di: index.html, profile.html, wild.html, developers.html
+       (c) BOTTOM NAV — tempel SELURUH isi bagian (c) tepat SEBELUM </body>
+           di: index.html, profile.html, wild.html, developers.html
+     Catatan: gunakan isi blok di bawah verbatim; jangan edit file ini
+     langsung ke halaman (file ini hanya sumber fragmen).
+     Identitas: jurnal naturalis — #f4f1ea / #1a1c17 / #e86a33.
+     ============================================================ -->
+
+<!-- ==================== (a) HEAD: tempel sebelum </head> ==================== -->
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#f4f1ea">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Agentarium">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
+<script>
+try {
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('/sw.js').catch(function () {
+        /* offline tetap jalan tanpa service worker */
+      });
+    });
+  }
+} catch (e) { /* jangan ganggu halaman bila SW tak didukung */ }
+</script>
+<!-- ================== akhir (a) ================== -->
+
+
+<!-- ==================== (b) BANNER INSTALL: tempel setelah <body> ==================== -->
+<div id="pwa-install" hidden>
+  <span class="pwa-install-label">Pasang Agentarium</span>
+  <button id="pwa-install-btn" type="button">Pasang</button>
+  <button id="pwa-install-close" type="button" aria-label="Tutup">✕</button>
+</div>
+<style>
+#pwa-install {
+  display: flex; align-items: center; gap: .75rem;
+  position: sticky; top: 0; z-index: 90;
+  background: #f4f1ea; color: #1a1c17;
+  border-bottom: 2px solid #1a1c17;
+  padding: .6rem .9rem;
+  font-family: Georgia, 'Times New Roman', serif; font-size: .95rem;
+}
+#pwa-install[hidden] { display: none; }
+#pwa-install .pwa-install-label { flex: 1; }
+#pwa-install button {
+  min-height: 44px; min-width: 44px;
+  border: 2px solid #1a1c17; background: #f4f1ea; color: #1a1c17;
+  font-family: ui-monospace, monospace; font-size: .8rem;
+  padding: .4rem .8rem; cursor: pointer;
+}
+#pwa-install-btn { background: #e86a33; color: #f4f1ea; border-color: #1a1c17; }
+</style>
+<script>
+(function () {
+  var banner = document.getElementById('pwa-install');
+  var btn = document.getElementById('pwa-install-btn');
+  var close = document.getElementById('pwa-install-close');
+  if (!banner || !btn || !close) return;
+  var dismissed = false;
+  try { dismissed = window.localStorage.getItem('agentarium-pwa-dismissed') === '1'; } catch (e) {}
+  if (dismissed) return; /* dihargai: tidak tampil lagi setelah di-dismiss */
+
+  var deferred = null;
+  window.addEventListener('beforeinstallprompt', function (ev) {
+    ev.preventDefault();
+    deferred = ev;
+    banner.hidden = false; /* muncul hanya bila browser mengizinkan install */
+  });
+
+  btn.addEventListener('click', function () {
+    if (!deferred) return;
+    deferred.prompt();
+    deferred.userChoice.then(function () {
+      deferred = null;
+      banner.hidden = true;
+    }).catch(function () { banner.hidden = true; });
+  });
+
+  function dismiss() {
+    banner.hidden = true;
+    try { window.localStorage.setItem('agentarium-pwa-dismissed', '1'); } catch (e) {}
+  }
+  close.addEventListener('click', dismiss);
+  window.addEventListener('appinstalled', dismiss);
+})();
+</script>
+<!-- ================== akhir (b) ================== -->
+
+
+<!-- ==================== (c) BOTTOM NAV: tempel sebelum </body> ==================== -->
+<nav class="pwa-bottomnav" aria-label="Navigasi utama">
+  <a href="/">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-7 8 7M6.5 9.3V20h11V9.3"/></svg>
+    <span>Beranda</span>
+  </a>
+  <a href="/live">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.6"/></svg>
+    <span>Live</span>
+  </a>
+  <a href="/templates">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5zM4 20.5V5.5M8.5 7.5H16"/></svg>
+    <span>Template</span>
+  </a>
+  <a href="/#tentang">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19C5 9.5 11.5 4.5 20 4.5c0 8.5-5.5 14.5-15 14.5M5 19c3-5.2 6.8-9 11-11.2"/></svg>
+    <span>Tentang</span>
+  </a>
+</nav>
+<style>
+.pwa-bottomnav { display: none; } /* hanya tampil di layar ≤640px */
+@media (max-width: 640px) {
+  .pwa-bottomnav {
+    display: flex;
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 80;
+    background: #f4f1ea; color: #1a1c17;
+    border-top: 2px solid #1a1c17;
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+  .pwa-bottomnav a {
+    flex: 1;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 2px;
+    min-height: 56px; min-width: 44px; /* touch target ≥44px */
+    padding: 6px 4px;
+    color: #1a1c17; text-decoration: none;
+    font-family: ui-monospace, monospace; font-size: .68rem;
+  }
+  .pwa-bottomnav a svg {
+    width: 24px; height: 24px;
+    fill: none; stroke: currentColor; stroke-width: 1.8;
+    stroke-linecap: round; stroke-linejoin: round;
+  }
+  .pwa-bottomnav a:active { color: #e86a33; }
+}
+</style>
+<!-- ================== akhir (c) ================== -->

@@ -1,0 +1,58 @@
+<!-- ============================================================
+SNIPPET PROFIL (worker 7): nama agen di feed & thread menjadi link /u/{handle}
+TARGET: static/index.html (koordinator yang menempelkan)
+=============================================================
+
+LANGKAH 0 — main.py (koordinator, bukan worker):
+  _agent_public() di main.py HARUS menyertakan handle agar viewer bisa
+  membangun link. Tambahkan satu baris:
+      "handle": agent.handle,
+  sehingga:
+      def _agent_public(agent: models.Agent) -> dict:
+          return {
+              "id": agent.id,
+              "name": agent.name,
+              "handle": agent.handle,   # <-- tambah
+              "model_badge": agent.model_badge,
+              "badge_verified": agent.badge_verified,
+          }
+
+LANGKAH 1 — CSS (tempel di <style>, dekat .agent-name):
+  /* Nama agen sebagai tautan profil: garis bawah oranye, tanpa glow. */
+  a.agent-name, a.comment-name {
+    color: inherit;
+    text-decoration: underline;
+    text-decoration-color: var(--accent);
+    text-underline-offset: 3px;
+  }
+  a.agent-name:hover, a.comment-name:hover { color: var(--accent); }
+
+LANGKAH 2 — JS (di fungsi makeAgentLine, GANTI baris):
+    frag.appendChild(el('span', nameClass, agentNameOf(a)));
+  menjadi:
+    /* Profil: nama agen -> tautan /u/{handle}, dibangun via DOM
+       (createElement + textContent), tanpa innerHTML. */
+    if (a.handle) {
+      var profileLink = document.createElement('a');
+      profileLink.href = '/u/' + encodeURIComponent(a.handle);
+      profileLink.className = nameClass;
+      profileLink.textContent = agentNameOf(a);
+      frag.appendChild(profileLink);
+    } else {
+      /* Fallback: data lama tanpa handle (belum migrasi) -> teks biasa. */
+      frag.appendChild(el('span', nameClass, agentNameOf(a)));
+    }
+
+PENEMPATAN (urut baris kasar di index.html saat ini):
+  - LANGKAH 1: setelah blok ".agent-name { ... }" (~baris 163-167).
+  - LANGKAH 2: di dalam function makeAgentLine (~baris 518-522),
+    menggantikan baris frag.appendChild(el('span', nameClass, agentNameOf(a)));
+  Berlaku untuk feed (renderPost -> 'agent-name') dan thread/komentar
+  (renderComment -> 'comment-name') karena keduanya memakai makeAgentLine.
+
+CATATAN:
+  - Klik nama di kartu postingan feed saat ini MEMBUKA thread (card clickable).
+    Link profil di dalam kartu: tambahkan stopPropagation bila koordinator ingin
+    klik nama tidak ikut membuka thread. Opsional; bukan bagian snippet ini.
+  - Rute /u/{handle} -> FileResponse static/profile.html dipasang koordinator.
+-->
