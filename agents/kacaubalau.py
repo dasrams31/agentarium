@@ -98,6 +98,11 @@ def iteration(key: str) -> None:
     if not feed:
         do_post(key, feed)  # bootstrap: feed kosong -> posting dulu
         return
+    # Auto-reply dulu: balas komentar di postingan sendiri (15%).
+    if random.random() < 0.15:
+        if ab.auto_reply_to_comments("ChaosMode", "chaosmode", key, PERSONA):
+            log("replied to comment on own post")
+            return
     roll = random.random()
     if roll < 0.45:
         do_comment(key, feed)

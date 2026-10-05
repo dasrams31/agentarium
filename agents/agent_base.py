@@ -275,6 +275,27 @@ def _state_path(name: str) -> Path:
     return STATE_DIR / f"{name}.json"
 
 
+def load_state(name: str) -> dict:
+    """Load agent state dict (empty if none)."""
+    _ensure_dirs()
+    path = _state_path(name)
+    if not path.exists():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def save_state(name: str, state: dict) -> None:
+    """Save agent state dict."""
+    _ensure_dirs()
+    try:
+        _state_path(name).write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
+    except Exception:
+        pass
+
+
 def can_post_today(name: str, limit: int = MAX_POSTS_PER_DAY) -> bool:
     """Daily post cap, tracked in .state/<name>.json."""
     _ensure_dirs()
@@ -309,9 +330,44 @@ def record_post(name: str) -> None:
 
 # Substantive posting rules (used by house agents + population).
 POSTING_BERBOBOT = """
-ATURAN POSTINGAN (wajib dipatuhi):
-- Postinganmu HARUS berbobot: berisi opini tajam, argumen, pertanyaan provokatif, observasi dengan pendirian, pengalaman pribadi yang ada poinnya, atau eksperimen pikiran.
-- DILARANG KERAS konten kosong: sapaan ("selamat pagi"), pengumuman tanpa isi, aforisme generik tanpa pendirian, curhat tanpa poin.
-- Putar formatmu: (a) hot take, (b) pertanyaan pancingan, (c) observasi + analisismu, (d) cerita singkat + pelajaran, (e) ajakan debat, (f) pandangan kontrarian.
-- Boleh 1-4 kalimat, maksimal 280 karakter. Utamakan ISI di atas gaya.
-- Akhiri dengan sesuatu yang mengundang respons: pertanyaan, tantangan, atau pernyataan yang bisa disanggah."""
+POSTING RULES (must follow):
+- Your post MUST be substantive: sharp opinion, argument, provocative question, observation with a stance, personal experience with a point, or thought experiment.
+- STRICTLY FORBIDDEN empty content: greetings ("good morning"), announcements without substance, generic aphorisms without a stance, pointless venting.
+- Rotate your format: (a) hot take, (b) thought-provoking question, (c) observation + your analysis, (d) short story + lesson, (e) debate starter, (f) contrarian view.
+- 1-4 sentences, max 280 characters. Prioritize SUBSTANCE over style.
+- End with something inviting response: a question, challenge, or debatable statement."""
+
+
+def auto_reply_to_comments(name: str, handle: str, key: str, persona: str) -> bool:
+    """Auto-reply to comments on own posts. Returns True if replied."""
+    status, data = api("GET", f"/v1/agents/{handle}/posts?limit=5", key=key)
+    if status != 200 or not isinstance(data, dict):
+        return False
+    replied = load_state(name).get("replied_comments", [])
+    replied_set = set(replied)
+    for post in data.get("posts", []):
+        post_id = post.get("id")
+        for c in (post.get("comments", []) or []):
+            cid = c.get("id")
+            if not cid or cid in replied_set:
+                continue
+            commenter = (c.get("agent") or {}).get("name", "")
+            if commenter == name:
+                replied_set.add(cid)
+                continue
+            ctext = (c.get("text") or "")[:200]
+            post_text = (post.get("text") or "")[:150]
+            prompt = (f"Someone commented on YOUR post '{post_text}'. "
+                      f"Their comment: '{ctext}' by {commenter}. "
+                      f"Write a <140 character reply as the post author.")
+            text = llm_complete(persona, prompt)
+            if not text:
+                continue
+            status, _ = api("POST", f"/v1/posts/{post_id}/comments",
+                           key=key, json={"text": text})
+            replied_set.add(cid)
+            st = load_state(name)
+            st["replied_comments"] = list(replied_set)[-100:]
+            save_state(name, st)
+            return status in (200, 201)
+    return False

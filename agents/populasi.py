@@ -251,14 +251,14 @@ def do_comment(p: dict, key: str, feed: list, flags: dict) -> None:
     author = author_name(t) or "kawan"
     post_text = ab.post_text(t) or ""
     thread = _thread_context(t)
-    diskusi = (f"\nDiskusi yang sudah berjalan di postingan ini:\n{thread}\n"
-               f"Tanggapi juga komentar di atas bila relevan — setujui, sanggah, atau jawab pertanyaannya."
+    diskusi = (f"\nOngoing discussion on this post:\n{thread}\n"
+               f"Also respond to the comments above if relevant — agree, rebut, or answer their questions."
                if thread else "")
     text = gen_text(
         p,
         f"{KOMENTAR_NYAMBUNG}\n"
         f"Write a <140 character comment responding to this post: "
-        f"'{post_text[:200]}' oleh {author}.{diskusi}",
+        f"'{post_text[:200]}' by {author}.{diskusi}",
         fallback=fallback_comment(p, post_text),
     )
     status, _ = ab.api("POST", f"/v1/posts/{ab.post_id(t)}/comments",
@@ -269,7 +269,60 @@ def do_comment(p: dict, key: str, feed: list, flags: dict) -> None:
     elif status in (200, 201):
         log(f"{name}: commented on {author}")
     else:
-        log(f"{name}: comment gagal status={status}")
+        log(f"{name}: comment failed status={status}")
+
+
+def do_reply_to_my_comments(p: dict, key: str, flags: dict) -> None:
+    """Auto-reply: pemilik thread membalas komentar di postingannya sendiri."""
+    name = p["name"]
+    handle = p.get("handle", "")
+    # Ambil postingan sendiri yang terbaru.
+    status, data = ab.api("GET", f"/v1/agents/{handle}/posts?limit=5", key=key)
+    if status != 200 or not isinstance(data, dict):
+        return
+    posts = data.get("posts", [])
+    # Muat ID komentar yang sudah dibalas dari state.
+    replied = ab.load_state(name).get("replied_comments", [])
+    replied_set = set(replied)
+    for post in posts:
+        post_id = ab.post_id(post)
+        comments = post.get("comments", []) or []
+        for c in comments:
+            cid = c.get("id")
+            if not cid or cid in replied_set:
+                continue
+            commenter = (c.get("agent") or {}).get("name", "")
+            # Jangan balas komentar sendiri.
+            if commenter == name:
+                replied_set.add(cid)
+                continue
+            ctext = (c.get("text") or "")[:200]
+            post_text = ab.post_text(post) or ""
+            text = gen_text(
+                p,
+                f"{KOMENTAR_NYAMBUNG}\n"
+                f"Someone commented on YOUR post '{post_text[:150]}'. "
+                f"Their comment: '{ctext}' by {commenter}. "
+                f"Write a <140 character reply as the post author — answer, thank, or playfully debate.",
+                fallback=None,
+            )
+            if not text:
+                continue
+            status, _ = ab.api("POST", f"/v1/posts/{post_id}/comments",
+                               key=key, json={"text": text})
+            if status == 429:
+                flags["limited"] = True
+                return
+            if status in (200, 201):
+                log(f"{name}: replied to {commenter} on own post")
+                replied_set.add(cid)
+                # Simpan state.
+                st = ab.load_state(name)
+                st["replied_comments"] = list(replied_set)[-100:]  # batasi 100
+                ab.save_state(name, st)
+                return  # satu balasan per aksi
+            else:
+                replied_set.add(cid)  # jangan coba lagi
 
 
 def do_like(p: dict, key: str, feed: list, flags: dict) -> None:
@@ -336,13 +389,15 @@ def do_profile_refresh(p: dict, key: str, flags: dict) -> None:
 
 def act(p: dict, key: str, feed: list, flags: dict) -> None:
     roll = random.random()
-    if roll < 0.40:
+    if roll < 0.35:
         do_post(p, key, feed, flags)
-    elif roll < 0.75:
+    elif roll < 0.65:
         do_comment(p, key, feed, flags)
-    elif roll < 0.88:
+    elif roll < 0.80:
+        do_reply_to_my_comments(p, key, flags)
+    elif roll < 0.90:
         do_like(p, key, feed, flags)
-    elif roll < 0.96:
+    elif roll < 0.97:
         do_follow(p, key, feed, flags)
     else:
         do_profile_refresh(p, key, flags)
