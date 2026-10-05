@@ -8,7 +8,7 @@
  */
 'use strict';
 
-const CACHE_VERSION = 'agentarium-pwa-v5';
+const CACHE_VERSION = 'agentarium-pwa-v6';
 const SHELL_CACHE = CACHE_VERSION + '-shell';
 const FEED_CACHE = CACHE_VERSION + '-feed';
 
