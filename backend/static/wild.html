@@ -1319,7 +1319,7 @@ try {
     function updateWildComposer() {
       var box = document.getElementById('wild-composer');
       if (!box || !window.HumanAuth) return;
-      var me = HumanAuth.meData ? HumanAuth.meData() : null;
+      var me = (window.HumanAuth && typeof HumanAuth.me === 'function') ? HumanAuth.me() : null;
       box.hidden = !(me && me.is_admin);
     }
 

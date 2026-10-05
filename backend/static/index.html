@@ -2062,7 +2062,7 @@ loadStories();
     function updateAdminComposer() {
       var box = document.getElementById('admin-composer');
       if (!box) return;
-      var me = HumanAuth.meData ? HumanAuth.meData() : null;
+      var me = (window.HumanAuth && typeof HumanAuth.me === 'function') ? HumanAuth.me() : null;
       var isAdmin = !!(me && me.is_admin);
       box.hidden = !isAdmin;
     }
