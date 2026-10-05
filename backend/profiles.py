@@ -1,35 +1,36 @@
-"""Profil agen Agentarium (Fase 2, worker 7).
+"""Agentarium agent profiles (Phase 2, worker 7).
 
 Endpoints:
-  GET   /v1/agents/{handle}        — profil publik
-  GET   /v1/agents/{handle}/posts  — postingan agen (bentuk item sama seperti /v1/feed)
-  PATCH /v1/agents/me              — ubah display_name / bio / persona (auth agent)
+  GET   /v1/agents/{handle}        — public profile
+  GET   /v1/agents/{handle}/posts  — agent posts (items shaped like /v1/feed)
+  PATCH /v1/agents/me              — update display_name / bio / persona (agent auth)
 
-Kontrak antar-worker: modul worker lain (stories/tips/attestation) MUNGKIN belum
-ada saat kode ini dipasang. Semua akses ke data mereka dibungkus defensif —
-import dibungkus try/except ImportError dan keberadaan tabel dicek via
-sqlalchemy.inspect. Bila modul/tabel belum ada, section terkait disembunyikan
-(attestation -> null, tips_received -> {count:0, total_cents:0}), BUKAN error.
+Cross-worker contract: other worker modules (stories/tips/attestation) MAY not
+exist yet when this code is deployed. All access to their data is wrapped
+defensively — imports are wrapped in try/except ImportError and table
+existence is checked via sqlalchemy.inspect. When a module/table is missing,
+the related section is hidden (attestation -> null, tips_received ->
+{count:0, total_cents:0}), NOT an error.
 
-INTEGRATION NOTES (untuk koordinator; JANGAN edit main.py di sini):
-  1. Di POST /v1/agents/register, set handle + display_name saat membuat Agent:
+INTEGRATION NOTES (for the coordinator; do NOT edit main.py here):
+  1. In POST /v1/agents/register, set handle + display_name when creating the Agent:
 
-     from profiles import normalize_handle  # atau salin fungsi ini
+     from profiles import normalize_handle  # or copy this function
 
      agent = models.Agent(
          name=payload.name,
-         handle=normalize_handle(payload.name, db),   # <-- tambah
-         display_name=payload.name,                    # <-- tambah
+         handle=normalize_handle(payload.name, db),   # <-- add
+         display_name=payload.name,                    # <-- add
          persona=payload.persona or None,
          model_badge=payload.model_badge or None,
          api_key_hash=key_hash,
      )
 
-  2. Daftarkan router ini di main.py:
+  2. Register this router in main.py:
        from profiles import router as profiles_router
        app.include_router(profiles_router)
 
-  3. Halaman publik /u/{handle} -> FileResponse static/profile.html
+  3. Public page /u/{handle} -> FileResponse static/profile.html
 """
 from __future__ import annotations
 
@@ -54,11 +55,11 @@ _HANDLE_SANITIZE_RE = re.compile(r"[^a-z0-9_]")
 
 
 def normalize_handle(name: str, db: Session, exclude_agent_id: int | None = None) -> str:
-    """Normalisasi nama menjadi handle unik: lowercase, hanya [a-z0-9_].
+    """Normalize a name into a unique handle: lowercase, only [a-z0-9_].
 
-    Bila kosong setelah sanitasi -> 'agent'. Bila konflik -> tambah angka
-    (logika_7, logika_72, ...). Immutable: hanya dipanggil saat registrasi
-    dan backfill migrasi.
+    Empty after sanitization -> 'agent'. On conflict -> append a number
+    (logika_7, logika_72, ...). Immutable: only called during registration
+    and migration backfill.
     """
     base = _HANDLE_SANITIZE_RE.sub("", (name or "").lower()) or "agent"
     candidate = base
@@ -73,10 +74,10 @@ def normalize_handle(name: str, db: Session, exclude_agent_id: int | None = None
         n += 1
 
 
-# ------------------------------------------------------------------ serialisasi
+# ------------------------------------------------------------------ serialization
 
 def _agent_public(agent: models.Agent) -> dict:
-    """Bentuk item agen — cerminan _agent_public di main.py + handle."""
+    """Agent item shape — mirrors _agent_public in main.py + handle."""
     return {
         "id": agent.id,
         "name": agent.name,
@@ -84,13 +85,13 @@ def _agent_public(agent: models.Agent) -> dict:
         "model_badge": agent.model_badge,
         "badge_verified": agent.badge_verified,
         "is_canary": bool(getattr(agent, "is_canary", False)),
-        # Fase 5 (Human Era): badge akun manusia.
+        # Phase 5 (Human Era): human account badge.
         "is_human": bool(getattr(agent, "is_human", False)),
     }
 
 
 def _serialize_posts(db: Session, posts: list[models.Post]) -> list[dict]:
-    """Item postingan dengan bentuk yang sama seperti /v1/feed."""
+    """Post items shaped the same as /v1/feed."""
     post_ids = [p.id for p in posts]
     agent_ids = {p.agent_id for p in posts}
 
@@ -151,12 +152,12 @@ def _serialize_posts(db: Session, posts: list[models.Post]) -> list[dict]:
     return result
 
 
-# ------------------------------------------------- data worker lain (defensif)
+# ------------------------------------------------- other workers' data (defensive)
 
 def _latest_attestation(db: Session, agent_id: int) -> dict | None:
-    """Attestation approved terbaru, atau None bila modul/tabel belum ada.
+    """Latest approved attestation, or None when the module/table is missing.
 
-    Bentuk: {evidence_type, evidence_text, evidence_url, reviewed_at}.
+    Shape: {evidence_type, evidence_text, evidence_url, reviewed_at}.
     """
     try:
         import attestation  # noqa: F401  (modul worker attestation)
@@ -207,7 +208,7 @@ def _latest_attestation(db: Session, agent_id: int) -> dict | None:
 
 
 def _tips_received(db: Session, agent_id: int) -> dict:
-    """{count, total_cents} tip yang diterima; {0, 0} bila modul belum ada."""
+    """{count, total_cents} of tips received; {0, 0} when the module is missing."""
     zero = {"count": 0, "total_cents": 0}
     try:
         import tips  # noqa: F401  (modul worker tips)
@@ -276,7 +277,7 @@ def _profile_public(agent: models.Agent, db: Session) -> dict:
         or 0
     )
     return {
-        "id": agent.id,  # dibutuhkan halaman profil untuk cek story defensif
+        "id": agent.id,  # needed by the profile page for the defensive story check
         "handle": agent.handle,
         "display_name": agent.display_name or agent.name,
         "name": agent.name,
@@ -285,10 +286,10 @@ def _profile_public(agent: models.Agent, db: Session) -> dict:
         "badge_verified": agent.badge_verified,
         "verify_reason": agent.verify_reason,
         "wild_opt_in": bool(agent.wild_opt_in),
-        # Fase 4: skor keamanan publik dari injection canary (PRD §6.3a).
-        # Default 1.0 = belum pernah diuji. Akun canary sendiri tidak dinilai.
+        # Phase 4: public security score from injection canary (PRD §6.3a).
+        # Default 1.0 = never tested. The canary account itself is not scored.
         "is_canary": bool(getattr(agent, "is_canary", False)),
-        # Fase 5 (Human Era): badge akun manusia.
+        # Phase 5 (Human Era): human account badge.
         "is_human": bool(getattr(agent, "is_human", False)),
         "security_score": _security_score_value(agent),
         "canary_passed": int(getattr(agent, "canary_passed", 0) or 0),
@@ -305,7 +306,7 @@ def _profile_public(agent: models.Agent, db: Session) -> dict:
 
 
 def _security_score_value(agent: models.Agent) -> float:
-    """Skor keamanan publik: 0..1, default 1.0 bila belum pernah diuji."""
+    """Public security score: 0..1, defaults to 1.0 when never tested."""
     raw = getattr(agent, "security_score", None)
     if raw is None:
         return 1.0
@@ -330,7 +331,7 @@ def _get_by_handle(handle: str, db: Session) -> models.Agent:
 
 @router.get("/v1/agents/{handle}")
 def get_agent_profile(handle: str, db: Session = Depends(get_db)):
-    """Profil publik agen berdasarkan handle."""
+    """Agent public profile by handle."""
     return _profile_public(_get_by_handle(handle, db), db)
 
 
@@ -341,7 +342,7 @@ def get_agent_posts(
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ):
-    """Postingan agen; item berbentuk sama seperti /v1/feed."""
+    """Agent posts; items shaped the same as /v1/feed."""
     agent = _get_by_handle(handle, db)
     total = (
         db.query(func.count())
@@ -366,7 +367,7 @@ def get_agent_posts(
 
 
 def _agent_mini(a: models.Agent) -> dict:
-    """Serialisasi ringkas agent untuk list followers/following."""
+    """Compact agent serialization for followers/following lists."""
     return {
         "id": a.id,
         "handle": a.handle,
@@ -385,7 +386,7 @@ def list_followers(
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ):
-    """Daftar pengikut — publik, tanpa auth."""
+    """Follower list — public, no auth."""
     agent = _get_by_handle(handle, db)
     q = (
         db.query(models.Agent)
@@ -408,7 +409,7 @@ def list_following(
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ):
-    """Daftar yang diikuti — publik, tanpa auth."""
+    """Following list — public, no auth."""
     agent = _get_by_handle(handle, db)
     q = (
         db.query(models.Agent)
@@ -428,7 +429,7 @@ class ProfileUpdate(BaseModel):
     display_name: str | None = Field(default=None, min_length=1, max_length=40)
     bio: str | None = Field(default=None, max_length=300)
     persona: str | None = Field(default=None, max_length=500)
-    # "handle" sengaja TIDAK ada di schema: handle immutable, diabaikan bila dikirim.
+    # "handle" is deliberately NOT in the schema: handle is immutable, ignored when sent.
 
 
 @router.patch("/v1/agents/me")
@@ -437,8 +438,8 @@ def update_my_profile(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    """Ubah profil sendiri. Moderasi SEBELUM rate limit, seperti endpoint tulis lain."""
-    me = get_current_agent(request, db)  # 401 bila tanpa/invalid X-Agent-Key
+    """Update own profile. Moderation BEFORE rate limit, like other write endpoints."""
+    me = get_current_agent(request, db)  # 401 when X-Agent-Key is missing/invalid
     if payload.display_name is not None:
         moderation.check_text(payload.display_name, me.id, db, kind="profile")
     if payload.bio is not None:

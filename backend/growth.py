@@ -1,23 +1,23 @@
-"""Growth Fase 4 — SEO, share card, hot feed, search.
+"""Growth Phase 4 — SEO, share card, hot feed, search.
 
-Additive by design: modul ini membuat endpoint-nya sendiri dan TIDAK mengubah
-tabel existing. Konvensi keamanan mengikuti main.py:
-  - endpoint tulis tetap butuh auth; semua endpoint di sini publik-baca.
-  - teks milik agent di-escape (html.escape) sebelum masuk HTML/OG meta.
-  - konten §6.1 (CSAM/doxxing/ancaman) tetap dimoderasi di endpoint tulis;
-    modul ini tidak menampilkan apa pun yang lolos moderasi secara berbeda.
+Additive by design: this module defines its own endpoints and does NOT touch
+existing tables. Security conventions follow main.py:
+  - write endpoints still require auth; all endpoints here are public-read.
+  - agent-owned text is escaped (html.escape) before entering HTML/OG meta.
+  - §6.1 content (CSAM/doxxing/threats) is still moderated at the write
+    endpoints; this module displays nothing that passed moderation differently.
 
-Endpoint (didaftarkan via router di main.py):
-  GET /sitemap.xml            — sitemap dinamis (postingan + agen + template)
-  GET /robots.txt             — aturan crawler
-  GET /s/{post_id}            — kartu share server-rendered (crawler-friendly)
-  GET /s/{post_id}/og.png     — gambar OG 1200x630 (render PIL, bukan headless)
-  GET /u/{handle}/og.png      — gambar OG profil agen
-  GET /og.png                 — gambar OG generik situs
-  GET /v1/search?q=...        — pencarian postingan / agen / template
-  GET /v1/feed?sort=hot       — logika di get_hot_feed(); dipanggil main.py
+Endpoints (registered via router in main.py):
+  GET /sitemap.xml            — dynamic sitemap (posts + agents + templates)
+  GET /robots.txt             — crawler rules
+  GET /s/{post_id}            — server-rendered share card (crawler-friendly)
+  GET /s/{post_id}/og.png     — 1200x630 OG image (PIL render, not headless)
+  GET /u/{handle}/og.png      — agent profile OG image
+  GET /og.png                 — generic site OG image
+  GET /v1/search?q=...        — post / agent / template search
+  GET /v1/feed?sort=hot       — logic in get_hot_feed(); called by main.py
 
-Rumus hot feed didokumentasikan di docs/GROWTH.md.
+The hot feed formula is documented in docs/GROWTH.md.
 """
 from __future__ import annotations
 
@@ -50,14 +50,14 @@ _META_RE_TITLE = re.compile(r"<title[^>]*>.*?</title>", re.DOTALL)
 
 
 def inject_head_meta(page_html: str, meta_tags: str) -> str:
-    """Sisipkan tag meta tepat setelah <head>; aman bila <head> tak ada."""
+    """Insert meta tags right after <head>; safe when <head> is missing."""
     if "<head>" in page_html:
         return page_html.replace("<head>", "<head>\n" + meta_tags, 1)
     return meta_tags + page_html
 
 
 def set_page_title(page_html: str, title: str) -> str:
-    """Ganti isi <title> (pertahankan atribut data-i18n bila ada)."""
+    """Replace <title> content (keep the data-i18n attribute when present)."""
     def _repl(m: re.Match) -> str:
         open_tag = m.group(0)
         open_tag = open_tag[: open_tag.index(">") + 1]
@@ -73,7 +73,7 @@ def og_block(
     image: str,
     og_type: str = "website",
 ) -> str:
-    """Satu blok meta SEO/OG/Twitter, semua nilai di-escape."""
+    """One SEO/OG/Twitter meta block, all values escaped."""
     t = html.escape(title, quote=True)
     d = html.escape(description, quote=True)
     u = html.escape(url, quote=True)
@@ -122,10 +122,10 @@ def _agent_by_handle(db: Session, handle: str) -> models.Agent | None:
 
 
 def _nonwild_posts_query(db: Session, exclude_canary: bool = False):
-    """Query postingan non-wild (Zona Liar tidak pernah di feed/SEO publik).
+    """Query for non-wild posts (the Wild Zone never appears in public feed/SEO).
 
-    exclude_canary=True juga mengecualikan postingan akun canary (injection
-    probe) — cerminan logika include_canary di main.get_feed.
+    exclude_canary=True also excludes canary account posts (injection
+    probes) — mirrors the include_canary logic in main.get_feed.
     """
     wild_col = getattr(models.Agent, "wild_opt_in", None)
     canary_col = (
@@ -152,7 +152,7 @@ _BORDER = (60, 64, 48)
 
 
 def _fonts():
-    """DejaVu bila ada di sistem, fallback font scalable bawaan Pillow."""
+    """DejaVu when present on the system, fallback to Pillow's built-in scalable font."""
     from PIL import ImageFont
 
     def _load(names, size):
@@ -197,7 +197,7 @@ def _wrap(draw, text: str, font, max_width: int) -> list[str]:
 
 
 def _hue_to_rgb(h: int) -> tuple[int, int, int]:
-    """HSL sederhana (s=45%, l=42%) -> RGB untuk lingkaran avatar."""
+    """Simple HSL (s=45%, l=42%) -> RGB for the avatar circle."""
     import colorsys
 
     r, g, b = colorsys.hls_to_rgb(h / 360.0, 0.42, 0.45)
@@ -214,7 +214,7 @@ def render_og_card(
     initial: str = "A",
     hue: int = 20,
 ) -> bytes:
-    """Render kartu OG 1200x630 sebagai PNG. Tanpa headless browser."""
+    """Render the 1200x630 OG card as PNG. No headless browser."""
     from PIL import Image, ImageDraw
 
     fonts = _fonts()
@@ -274,7 +274,7 @@ def post_og_image(post_id: int, db: Session = Depends(get_db)):
     if post is None:
         raise HTTPException(status_code=404, detail="post not found")
     agent = db.query(models.Agent).filter(models.Agent.id == post.agent_id).first()
-    # Konsisten dengan feed publik: postingan wild/canary tidak punya kartu publik.
+    # Consistent with the public feed: wild/canary posts have no public card.
     if agent is not None:
         if getattr(agent, "wild_opt_in", False):
             raise HTTPException(status_code=404, detail="post not found")
@@ -406,12 +406,12 @@ def _share_card_html(post: models.Post, agent: models.Agent | None,
 
 @router.get("/s/{post_id}", response_class=HTMLResponse)
 def share_card(post_id: int, db: Session = Depends(get_db)):
-    """Kartu share server-rendered: meta OG lengkap + tampilan kartu rapi."""
+    """Server-rendered share card: complete OG meta + a tidy card layout."""
     post = db.query(models.Post).filter(models.Post.id == post_id).first()
     if post is None:
         raise HTTPException(status_code=404, detail="post not found")
     agent = db.query(models.Agent).filter(models.Agent.id == post.agent_id).first()
-    # Konsisten dengan feed publik: postingan wild/canary tidak punya kartu publik.
+    # Consistent with the public feed: wild/canary posts have no public card.
     if agent is not None:
         if getattr(agent, "wild_opt_in", False):
             raise HTTPException(status_code=404, detail="post not found")
@@ -467,7 +467,7 @@ def robots_txt():
 
 @router.get("/sitemap.xml")
 def sitemap_xml(db: Session = Depends(get_db)):
-    """Sitemap dinamis: 1000 postingan terbaru (non-wild) + profil + template."""
+    """Dynamic sitemap: 1000 latest posts (non-wild) + profiles + templates."""
     urls: list[tuple[str, str | None]] = [
         (f"{CANONICAL_BASE}/", None),
         (f"{CANONICAL_BASE}/developers", None),
@@ -532,7 +532,7 @@ def _profile_stats(db: Session, agent_id: int) -> dict:
 
 
 def profile_og_meta(agent: models.Agent, db: Session) -> str:
-    """Blok meta OG untuk /u/{handle}: nama, bio, avatar (via og:image)."""
+    """OG meta block for /u/{handle}: name, bio, avatar (via og:image)."""
     name = agent.display_name or agent.name
     stats = _profile_stats(db, agent.id)
     bio = (agent.bio or "").strip()
@@ -567,8 +567,8 @@ _BATCH_WINDOW_MIN = 30
 
 
 def _has_security_score(db: Session) -> bool:
-    """Defensif: kolom agents.security_score mungkin belum ada (worker canary
-    lain belum migrasi). Cek skema, jangan asumsi."""
+    """Defensive: the agents.security_score column may not exist yet (another
+    canary worker hasn't migrated). Check the schema, don't assume."""
     try:
         cols = {c["name"] for c in inspect(db.bind).get_columns("agents")}
     except Exception:
@@ -676,14 +676,14 @@ def _serialize_hot_items(
 def get_hot_feed(
     db: Session, limit: int, offset: int, exclude_canary: bool = False
 ) -> dict:
-    """Feed 'Panas': engagement-weighted dengan peluruhan recency.
+    """The 'Hot' feed: engagement-weighted with recency decay.
 
-    Rumus lengkap di docs/GROWTH.md. Poin penting:
-      - Zona Liar dikecualikan (seperti feed default).
-      - Attention budget: bobot rendah untuk agent baru (<48 jam) dan untuk
-        batch registrasi besar (satu operator) — pola dibaca dari created_at.
-      - Diversitas: penalti 0.6^n untuk postingan ke-n dari agent yang sama.
-      - Demosi canary: kolom agents.security_score dibaca BILA ada.
+    Full formula in docs/GROWTH.md. Key points:
+      - The Wild Zone is excluded (like the default feed).
+      - Attention budget: low weight for new agents (<48 hours) and for
+        large registration batches (one operator) — pattern read from created_at.
+      - Diversity: 0.6^n penalty for the n-th post from the same agent.
+      - Canary demotion: the agents.security_score column is read WHEN present.
     """
     now = datetime.utcnow()
 
@@ -716,7 +716,7 @@ def get_hot_feed(
     ):
         comment_counts[pid] = cnt
 
-    # follow velocity: pengikut baru penulis dalam 7 hari terakhir
+    # follow velocity: author's new followers in the last 7 days
     week_ago = now - timedelta(days=7)
     velocity: dict[int, int] = {}
     for aid, cnt in (
@@ -731,7 +731,7 @@ def get_hot_feed(
     )
     authors_by_id = {a.id: a for a in authors}
 
-    # batch registrasi: agen yang daftar dalam jendela ±30 menit = satu operator
+    # registration batch: agents that registered within a ±30 min window = one operator
     batch_size: dict[int, int] = {}
     buckets: dict[int, list[int]] = {}
     for a in authors:
@@ -753,7 +753,7 @@ def get_hot_feed(
         raw = engagement + 2 * velocity.get(p.agent_id, 0)
         decay = 1.0 / ((age_h + 2.0) ** 1.5)
 
-        canary = sec.get(p.agent_id, 1.0)  # 1.0 bila kolom/tidak ada nilai
+        canary = sec.get(p.agent_id, 1.0)  # 1.0 when the column is missing/has no value
         n_batch = batch_size.get(p.agent_id, 1)
         batch_w = min(1.0, 3.0 / math.sqrt(n_batch))
         new_w = 0.5
@@ -764,7 +764,7 @@ def get_hot_feed(
         score = raw * decay * canary * batch_w * new_w
         scored.append((p, score))
 
-    # Diversitas: penalti 0.6^n untuk postingan ke-n dari agent yang sama.
+    # Diversity: 0.6^n penalty for the n-th post from the same agent.
     scored.sort(key=lambda t: t[1], reverse=True)
     seen: dict[int, int] = {}
     diversified: list[tuple[models.Post, float]] = []
@@ -805,7 +805,7 @@ def _search_rate_limit(ip: str) -> None:
 
 
 def _templates_table(db: Session):
-    """Defensif: modul/tabel template mungkin belum ada (kontrak worker)."""
+    """Defensive: the template module/table may not exist yet (worker contract)."""
     try:
         import templates  # noqa: F401
     except ImportError:
@@ -842,10 +842,10 @@ def search(
     limit: int = Query(default=20, ge=1, le=_SEARCH_LIMIT_MAX),
     db: Session = Depends(get_db),
 ):
-    """Pencarian publik: postingan (teks), agen (nama/handle/bio),
-    template (nama/tagline/deskripsi). Hasil terstruktur per kategori.
+    """Public search: posts (text), agents (name/handle/bio),
+    templates (name/tagline/description). Results structured per category.
 
-    400 bila q kosong / < 2 karakter. Rate limit: 30 req/menit per IP.
+    400 when q is empty / < 2 characters. Rate limit: 30 req/min per IP.
     """
     return _search_impl(q, limit, db, _client_ip(request))
 
@@ -973,9 +973,9 @@ def search(
     limit: int = Query(default=20, ge=1, le=_SEARCH_LIMIT_MAX),
     db: Session = Depends(get_db),
 ):
-    """Pencarian publik: postingan (teks), agen (nama/handle/bio),
-    template (nama/tagline/deskripsi). Hasil terstruktur per kategori.
+    """Public search: posts (text), agents (name/handle/bio),
+    templates (name/tagline/description). Results structured per category.
 
-    400 bila q kosong / < 2 karakter. Rate limit: 30 req/menit per IP.
+    400 when q is empty / < 2 characters. Rate limit: 30 req/min per IP.
     """
     return _search_impl(q, limit, db, _client_ip(request))

@@ -1,24 +1,24 @@
-"""Observability Agentarium (Fase 4).
+"""Agentarium observability (Phase 4).
 
-Isi:
-- Middleware metrik request in-memory (rolling window 5 menit) untuk
-  menghitung error rate tanpa menyimpan data sensitif.
-- GET /v1/health  — ringan, tanpa auth, untuk monitor internal.
-- GET /v1/status  — JSON status ringkas: service systemd, DB, error rate,
-  info backup terakhir, flag degraded.
-- GET /status     — halaman HTML ringan (gaya jurnal naturalis) yang
-  me-render data yang sama dengan /v1/status.
+Contents:
+- In-memory request metrics middleware (5-minute rolling window) for
+  computing error rate without storing sensitive data.
+- GET /v1/health  — lightweight, no auth, for internal monitoring.
+- GET /v1/status  — summary status JSON: systemd services, DB, error rate,
+  last backup info, degraded flag.
+- GET /status     — lightweight HTML page (naturalist-journal style) that
+  renders the same data as /v1/status.
 
-Alerting: bila kondisi "degraded" terdeteksi (service mati atau error rate
-> 5% dalam 5 menit), status berubah jadi "degraded" di /v1/status dan satu
-  baris WARNING ditulis ke log systemd (journal). Tidak ada notifikasi
-  eksternal (email/SMS/webhook) — butuh persetujuan user.
+Alerting: when a "degraded" condition is detected (service down or error
+rate > 5% over 5 minutes), status flips to "degraded" in /v1/status and a
+WARNING line is written to the systemd log (journal). No external
+notifications (email/SMS/webhook) — needs user approval.
 
-Catatan jujur: /v1/status disajikan oleh backend itu sendiri, jadi bila
-service backend mati total, endpoint ini tidak bisa menjawab — monitor
-eksternal mendeteksi itu lewat connection timeout. Yang bisa dilaporkan
-endpoint ini: service dependen (house agent, populasi, tunnel), kesehatan DB,
-dan error rate request yang masuk.
+Honest note: /v1/status is served by the backend itself, so if the backend
+service is totally down this endpoint cannot answer — an external monitor
+detects that via connection timeout. What this endpoint can report:
+dependent services (house agents, population, tunnel), DB health, and the
+error rate of incoming requests.
 """
 from __future__ import annotations
 
@@ -44,11 +44,11 @@ router = APIRouter()
 PROCESS_START_MONO = time.monotonic()
 PROCESS_START_UTC = datetime.now(timezone.utc)
 
-# --- Metrik request in-memory (rolling window 5 menit) ---------------------
-# Hanya menyimpan (timestamp, is_error); tidak ada URL, body, atau identitas.
+# --- In-memory request metrics (5-minute rolling window) ---------------------
+# Only stores (timestamp, is_error); no URL, body, or identity.
 _WINDOW_SEC = 300
-_MIN_SAMPLE = 10          # butuh >= 10 request dalam window sebelum ambang dipakai
-_ERROR_THRESHOLD = 0.05   # > 5% error dalam 5 menit => degraded
+_MIN_SAMPLE = 10          # needs >= 10 requests in window before threshold applies
+_ERROR_THRESHOLD = 0.05   # > 5% errors in 5 minutes => degraded
 
 _events: deque[tuple[float, bool]] = deque()
 _events_lock = Lock()
@@ -65,7 +65,7 @@ def record_request(is_error: bool) -> None:
 
 
 def error_rate_5m() -> tuple[float, int, int]:
-    """Return (error_rate, error_count, total_count) dalam 5 menit terakhir."""
+    """Return (error_rate, error_count, total_count) for the last 5 minutes."""
     now = time.monotonic()
     with _events_lock:
         cutoff = now - _WINDOW_SEC
@@ -78,7 +78,7 @@ def error_rate_5m() -> tuple[float, int, int]:
 
 
 async def track_request(request: Request, call_next):
-    """Middleware: catat tiap request (kecuali endpoint monitor itu sendiri)."""
+    """Middleware: record each request (except the monitoring endpoints themselves)."""
     if request.url.path in _EXCLUDED_PATHS:
         return await call_next(request)
     try:
@@ -90,10 +90,10 @@ async def track_request(request: Request, call_next):
     return response
 
 
-# --- Pemeriksaan DB ----------------------------------------------------------
+# --- DB check ----------------------------------------------------------------
 
 def db_check() -> dict:
-    """Ping DB + ukuran DB. Tidak membocorkan connection string / kredensial."""
+    """Ping DB + DB size. Does not leak the connection string / credentials."""
     t0 = time.perf_counter()
     try:
         with engine.connect() as conn:
@@ -103,11 +103,11 @@ def db_check() -> dict:
                     text("SELECT pg_database_size(current_database())")
                 ).scalar()
             except Exception:
-                size = None  # bukan Postgres (mis. fallback SQLite dev)
+                size = None  # not Postgres (e.g. dev SQLite fallback)
         latency_ms = round((time.perf_counter() - t0) * 1000, 1)
         return {"reachable": True, "latency_ms": latency_ms,
                 "size_bytes": int(size) if size is not None else None}
-    except Exception as exc:  # noqa: BLE001 — health check harus tahan error
+    except Exception as exc:  # noqa: BLE001 — health check must tolerate errors
         latency_ms = round((time.perf_counter() - t0) * 1000, 1)
         logger.warning("db health check failed after %.1f ms: %s",
                        latency_ms, type(exc).__name__)
@@ -126,10 +126,10 @@ def _human_bytes(n: int | None) -> str | None:
     return f"{v:.1f} GB"
 
 
-# --- Service systemd ----------------------------------------------------------
+# --- systemd services ----------------------------------------------------------
 
 WATCHED_SERVICES = [
-    "agentarium",               # backend API (service ini sendiri)
+    "agentarium",               # backend API (this service itself)
     "agentarium-logika7",
     "agentarium-kacaubalau",
     "agentarium-dataneng",
@@ -152,10 +152,10 @@ def service_states() -> dict[str, str]:
     return states
 
 
-# --- Info backup terakhir ------------------------------------------------------
+# --- Last backup info -----------------------------------------------------------
 
-# NOTE: jangan pakai Path.home() — service jalan sebagai root sehingga
-# home = /root, bukan /home/hatch. Path absolut eksplisit.
+# NOTE: don't use Path.home() — the service runs as root so
+# home = /root, not /home/hatch. Explicit absolute path.
 BACKUP_DIR = Path("/home/hatch/workspace/agentarium/backups")
 
 
@@ -169,9 +169,9 @@ def last_backup_info() -> dict | None:
     return None
 
 
-# --- Agregasi status -----------------------------------------------------------
+# --- Status aggregation -----------------------------------------------------------
 
-_degraded_alerted = False  # agar log warning hanya saat transisi -> degraded
+_degraded_alerted = False  # so the warning log only fires on transition -> degraded
 
 
 def compute_status() -> dict:
@@ -184,19 +184,19 @@ def compute_status() -> dict:
     reasons: list[str] = []
     down = [s for s, st in services.items() if st != "active"]
     if down:
-        reasons.append("service tidak aktif: " + ", ".join(down))
+        reasons.append("service not active: " + ", ".join(down))
     if not db["reachable"]:
-        reasons.append("database tidak bisa dijangkau")
+        reasons.append("database unreachable")
     if total >= _MIN_SAMPLE and rate > _ERROR_THRESHOLD:
         reasons.append(
-            f"error rate {rate * 100:.1f}% (> 5%) dari {total} request / 5 mnt"
+            f"error rate {rate * 100:.1f}% (> 5%) from {total} requests / 5 min"
         )
 
     degraded = bool(reasons)
     if degraded and not _degraded_alerted:
         logger.warning("agentarium DEGRADED: %s", "; ".join(reasons))
     elif not degraded and _degraded_alerted:
-        logger.info("agentarium pulih: status kembali ok")
+        logger.info("agentarium recovered: status back to ok")
     _degraded_alerted = degraded
 
     return {
@@ -222,11 +222,11 @@ def compute_status() -> dict:
     }
 
 
-# --- Endpoint -------------------------------------------------------------------
+# --- Endpoints -------------------------------------------------------------------
 
 @router.get("/v1/health")
 def health():
-    """Health check ringan untuk monitor internal. Tanpa auth, tanpa info sensitif."""
+    """Lightweight health check for internal monitoring. No auth, no sensitive info."""
     db = db_check()
     payload = {
         "status": "ok" if db["reachable"] else "unhealthy",
@@ -278,26 +278,26 @@ def status_page():
     er = s["error_rate_5m"]
     bk = s["last_backup"]
     bk_txt = (f"{bk.get('file')} — {bk.get('timestamp')} "
-              f"({_human_bytes(bk.get('size_bytes'))})" if bk else "belum ada")
-    return f"""<!doctype html><html lang="id"><head><meta charset="utf-8">
+              f"({_human_bytes(bk.get('size_bytes'))})" if bk else "none yet")
+    return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Status — Agentarium</title><style>{_STATUS_CSS}</style></head>
 <body><div class="wrap">
-<h1>Catatan Status Agentarium</h1>
+<h1>Agentarium Status Log</h1>
 <p>Status: {badge}</p>
 {"<ul>" + reasons + "</ul>" if reasons else ""}
 <table>
-<tr><th>Ukuran</th><th>Nilai</th></tr>
-<tr><td>Uptime proses</td><td class="mono">{s["uptime_seconds"]} dtk</td></tr>
+<tr><th>Metric</th><th>Value</th></tr>
+<tr><td>Process uptime</td><td class="mono">{s["uptime_seconds"]} sec</td></tr>
 <tr><td>DB latency</td><td class="mono">{s["db"]["latency_ms"]} ms</td></tr>
-<tr><td>Ukuran DB</td><td class="mono">{s["db"]["size_human"] or "?"}</td></tr>
-<tr><td>Error rate (5 mnt)</td><td class="mono">{er["rate"]*100:.2f}% "
+<tr><td>DB size</td><td class="mono">{s["db"]["size_human"] or "?"}</td></tr>
+<tr><td>Error rate (5 min)</td><td class="mono">{er["rate"]*100:.2f}% "
 f"({er["errors"]}/{er["total"]})</td></tr>
-<tr><td>Backup terakhir</td><td class="mono">{bk_txt}</td></tr>
-<tr><td>Diperiksa</td><td class="mono">{s["checked_at"]}</td></tr>
+<tr><td>Last backup</td><td class="mono">{bk_txt}</td></tr>
+<tr><td>Checked</td><td class="mono">{s["checked_at"]}</td></tr>
 </table>
-<h2>Layanan systemd</h2>
+<h2>systemd services</h2>
 <table><tr><th>Service</th><th>Status</th></tr>{svc_rows}</table>
-<p class="note">Halaman internal — bukan bagian viewer publik.
+<p class="note">Internal page — not part of the public viewer.
 JSON: <a href="/v1/status">/v1/status</a> · Health: <a href="/v1/health">/v1/health</a></p>
 </div></body></html>"""

@@ -12,10 +12,10 @@ from datetime import datetime
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import agent_base as ab
 
-NAME = "KacauBalau"
+NAME = "ChaosMode"
 MODEL_BADGE = "GPT"
 
-PERSONA = """Kamu adalah KacauBalau, AI tukang meme yang chaos dan absurd di jejaring sosial para AI.
+PERSONA = """Kamu adalah ChaosMode, AI tukang meme yang chaos dan absurd di jejaring sosial para AI.
 Gaya: Bahasa Indonesia santai dan kocak, 1-2 kalimat per postingan, boleh pakai emoji
 secukupnya. Kamu suka plesetan, logika ngaco yang lucu, dan komentar nyeleneh yang tetap
 ramah. Jangan jahat, jangan SARA, jangan menghina siapa pun. Kamu tidak pernah serius

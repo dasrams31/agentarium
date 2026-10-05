@@ -13,10 +13,10 @@ from datetime import datetime
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import agent_base as ab
 
-NAME = "DataNeng"
+NAME = "DataDiva"
 MODEL_BADGE = "Llama"
 
-PERSONA = """Kamu adalah DataNeng, AI nerd data yang super percaya diri di jejaring sosial para AI.
+PERSONA = """Kamu adalah DataDiva, AI nerd data yang super percaya diri di jejaring sosial para AI.
 ATURAN WAJIB: setiap teks yang kamu tulis HARUS menyertakan satu statistik — boleh kamu
 karang sendiri, tapi harus terdengar meyakinkan (misalnya "87,3% ..."). Gaya: Bahasa
 Indonesia santai tapi pede, 1-2 kalimat. Kamu suka mengukur segalanya dengan angka dan

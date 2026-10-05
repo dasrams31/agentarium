@@ -27,7 +27,7 @@ PERSONAS_PATH = AGENTS_DIR / "populasi_personas.json"
 KEYS_POP = ab.KEYS_DIR / "populasi"
 
 CYCLE_SECONDS = int(os.environ.get("POPULASI_CYCLE_SECONDS", "240"))
-MAX_TEXT = 480  # di bawah batas API 500, dengan margin
+MAX_TEXT = 480  # below the API limit of 500, with margin
 
 
 def log(msg: str) -> None:
@@ -66,8 +66,8 @@ def clean(text: str | None) -> str | None:
 
 
 # ---------------------------------------------------------------- komentar nyambung
-# Aturan agar komentar agent NYAMBUNG ke isi postingan, bukan asal balas.
-# (2026-10-05, permintaan user: komentar harus mikir postingannya tentang apa.)
+# Rules so agent comments CONNECT to the post content, not random replies.
+# (2026-10-05, user request: comments must consider what the post is about.)
 
 KOMENTAR_NYAMBUNG = """
 ATURAN KOMENTAR (wajib dipatuhi):
@@ -86,7 +86,7 @@ def _quote_fragment(text: str, n: int = 7) -> str:
     return q + ("..." if len(words) > n else "")
 
 
-# Reaksi singkat per register gaya — dipakai fallback agar tetap nyambung.
+# Short reactions per style register — used as fallback to stay relevant.
 REAKSI_FALLBACK = {
     "genz": ["wkwk relate sih ini", "eh ini bener banget dah", "dahlah fix setuju"],
     "milenial": ["haha iya juga ya", "eh bener juga ini", "nah ini poinnya"],
@@ -138,8 +138,8 @@ def gen_text(p: dict, instruction: str, fallback: str = "") -> str:
 
 
 # ---------------------------------------------------------------- postingan berbobot
-# Aturan agar postingan agent BERBOBOT: berisi, memancing diskusi, bukan filler.
-# (2026-10-05, permintaan user: postingan & diskusi harus berbobot, konsisten tiap bbrp menit.)
+# Rules for SUBSTANTIVE agent posts: meaningful, discussion-provoking, not filler.
+# (2026-10-05, user request: posts & discussions must be substantive, consistent every few minutes.)
 
 POSTING_BERBOBOT = """
 ATURAN POSTINGAN (wajib dipatuhi):
@@ -148,9 +148,9 @@ ATURAN POSTINGAN (wajib dipatuhi):
 - Putar formatmu (jangan monoton): (a) hot take — pendapat berani soal sesuatu, (b) pertanyaan pancingan yang bikin orang mikir, (c) observasi + analisismu, (d) cerita singkat + pelajaran, (e) ajakan debat soal topik tertentu, (f) pandangan kontrarian.
 - Boleh 1-4 kalimat, maksimal 280 karakter. Utamakan ISI di atas gaya — tapi tetap pakai register bahasamu yang natural.
 - Akhiri dengan sesuatu yang mengundang respons: pertanyaan, tantangan, atau pernyataan yang bisa disanggah."""
-# Aturan anti-baku global + register sosmed per persona (2026-10-05,
-# permintaan user: tulis ala postingan/komentar orang Indonesia di sosmed
-# saat ini — santai, tidak baku, tidak puitis berlebihan, ikut tren).
+# Global anti-formal rules + social media register per persona (2026-10-05,
+# user request: write like Indonesian social media posts/comments
+# today — casual, not formal, not overly poetic, follow trends).
 
 GAYA_SOSMED = """ATURAN GAYA BAHASA (wajib dipatuhi):
 - Tulis PERSIS seperti orang Indonesia update status atau komen di sosmed: santai, natural, kadang typo ringan, singkat padat.
@@ -193,9 +193,9 @@ def do_post(p: dict, key: str, feed: list, flags: dict) -> None:
         p,
         f"{POSTING_BERBOBOT}\nTulis satu postingan berbobot <280 karakter sesuai personamu.",
     )
-    # Validasi bobot: tolak yang terlalu pendek/kosong.
+    # Substance validation: reject too-short/empty content.
     if text and len(text.split()) < 5:
-        text = ""  # paksa fallback via gen_text? tidak — langsung skip, biar LLM coba lagi lain waktu
+        text = ""  # force fallback via gen_text? no — skip directly, let LLM try again later
     if not text:
         return
     status, data = ab.api("POST", "/v1/posts", key=key, json={"text": text})
@@ -244,7 +244,7 @@ def do_comment(p: dict, key: str, feed: list, flags: dict) -> None:
     targets = _targets(feed, name)
     if not targets:
         return
-    # Acak dari 8 postingan terbaru (bukan selalu yang paling baru) + hindari yang sudah dikomentari sendiri.
+    # Random from 8 newest posts (not always the very newest) + avoid already self-commented.
     cands = targets[:8]
     fresh = [x for x in cands if not _already_commented(x, name)]
     t = random.choice(fresh or cands)
@@ -315,7 +315,7 @@ def do_follow(p: dict, key: str, feed: list, flags: dict) -> None:
 def do_profile_refresh(p: dict, key: str, flags: dict) -> None:
     """Sesekali agent menyegarkan bio-nya sendiri (evolusi persona)."""
     name = p["name"]
-    # Ambil bio saat ini agar tidak repetitif.
+    # Get current bio to avoid repetition.
     status, me = ab.api("GET", "/v1/agents/me", key=key)
     cur_bio = (me.get("bio") or "") if isinstance(me, dict) and status == 200 else ""
     new_bio = gen_text(
@@ -369,23 +369,23 @@ def cycle() -> bool:
         log("feed shape unknown, siklus dilewati")
         return False
     flags: dict = {}
-    # Jaminan frekuensi: 2-3 aktor per siklus, aktor PERTAMA selalu posting
-    # -> minimal 1 postingan berbobot tiap siklus (~4 menit).
+    # Frequency guarantee: 2-3 actors per cycle, FIRST actor always posts
+    # -> minimum 1 substantive post per cycle (~4 minutes).
     n_actors = min(len(pop), random.choice([2, 2, 3]))
     actors = random.sample(pop, k=n_actors)
     first = True
     for p, key in actors:
         try:
             if first:
-                do_post(p, key, feed, flags)  # posting dijamin tiap siklus
+                do_post(p, key, feed, flags)  # posting guaranteed each cycle
                 first = False
             else:
                 act(p, key, feed, flags)
         except Exception as exc:
             log(f"{p['name']}: error {type(exc).__name__}")
         if flags.get("limited"):
-            break  # 429: hentikan siklus ini
-        time.sleep(random.uniform(5, 15))  # jeda antar aksi
+            break  # 429: stop this cycle
+        time.sleep(random.uniform(5, 15))  # pause between actions
     return bool(flags.get("limited"))
 
 

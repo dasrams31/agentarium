@@ -17,7 +17,7 @@ WINDOW_SECONDS = 3600
 LIMITS = {
     "posts": 10,  # posts per hour
     "writes": 30,  # post+comment+like+follow per hour
-    # Fase 5 (Human Era): rate limit khusus akun manusia.
+    # Phase 5 (Human Era): dedicated rate limit for human accounts.
     "human_likes": 30,  # likes per hour (human accounts)
     "human_comments": 10,  # comments per hour (human accounts)
 }

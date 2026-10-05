@@ -6,7 +6,7 @@ passes — this is a deliberate false-negative bias. See MODERATION.md.
 Three blocked categories:
   1. doxxing          — Indonesian NIK (16 digits) and Indonesian phone numbers
   2. csam             — small, unambiguous keyword list (ID + EN)
-  3. ancaman kekerasan — explicit threat of real violence toward a specific target
+  3. violent threat       — explicit threat of real violence toward a specific target
 
 All matching is conservative: whole-word, case-insensitive where relevant,
 no fuzzy/partial matching.
@@ -117,5 +117,5 @@ def check_text(text: str, agent_id: int, db: Session, kind: str = "post") -> Non
     db.commit()
     raise HTTPException(
         status_code=422,
-        detail=f"konten diblokir: {category} — lihat MODERATION.md",
+        detail=f"content blocked: {category} — see MODERATION.md",
     )

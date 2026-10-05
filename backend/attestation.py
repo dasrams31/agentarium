@@ -1,14 +1,14 @@
-"""Partner attestation — pengajuan bukti + review admin untuk verifikasi badge.
+"""Partner attestation — evidence submissions + admin review for badge verification.
 
-KEJUJURAN PRODUK (baca dulu): modul ini TIDAK melakukan verifikasi
-kriptografis. Semua evidence_type di bawah ini adalah *asersi
-non-kriptografis* yang dikirim operator agent sendiri. Admin mereview
-klaim tersebut secara manual sebelum badge diverifikasi. Lihat
-VERIFICATION.md bagian "Partner attestation" untuk kriteria dan batasannya.
+PRODUCT HONESTY (read first): this module does NOT perform cryptographic
+verification. All evidence_type values below are *non-cryptographic
+assertions* submitted by the agent's own operator. The admin reviews
+those claims manually before the badge is verified. See
+VERIFICATION.md section "Partner attestation" for criteria and limits.
 
-Jalur: agent mengajukan attestation (bukti pendukung klaim model badge-nya)
--> admin mereview lewat endpoint admin -> bila disetujui, badge agent
-ditandai verified dengan verify_reason="attestation:<evidence_type>".
+Flow: agent submits an attestation (evidence supporting its model badge claim)
+-> admin reviews via admin endpoints -> if approved, the agent badge
+is marked verified with verify_reason="attestation:<evidence_type>".
 """
 from __future__ import annotations
 
@@ -33,13 +33,13 @@ STATUSES = ("pending", "approved", "rejected")
 
 
 class Attestation(Base):
-    """Satu pengajuan bukti attestation dari operator sebuah agent.
+    """One attestation evidence submission from an agent's operator.
 
-    - evidence_type: salah satu dari EVIDENCE_TYPES. Ketiganya
-      didefinisikan sebagai asersi NON-KRIPTOGRAFIS kecuali dinyatakan
-      lain secara eksplisit. Tidak ada field signature di sini.
-    - status: pending -> approved | rejected. Review bersifat satu arah
-      dan tidak dapat diulang (idempoten: review ganda -> 409).
+    - evidence_type: one of EVIDENCE_TYPES. All three are defined as
+      NON-CRYPTOGRAPHIC assertions unless explicitly stated otherwise.
+      There is no signature field here.
+    - status: pending -> approved | rejected. Reviews are one-way
+      and cannot be repeated (idempotent: double review -> 409).
     """
 
     __tablename__ = "attestations"
@@ -100,15 +100,15 @@ def submit_attestation(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    """Ajukan bukti attestation untuk badge model. Satu pending per agent."""
+    """Submit attestation evidence for the model badge. One pending submission per agent."""
     me = get_current_agent(request, db)
     if payload.evidence_type not in EVIDENCE_TYPES:
         raise HTTPException(
             status_code=422,
-            detail=f"evidence_type tidak valid; harus salah satu dari: "
+            detail=f"invalid evidence_type; must be one of: "
             f"{', '.join(EVIDENCE_TYPES)}",
         )
-    # moderation SEBELUM rate limit: konten yang diblokir tidak memakan kuota
+    # moderation BEFORE rate limit: blocked content must not consume quota
     moderation.check_text(payload.evidence_text, me.id, db, kind="attestation")
     ratelimit.check(db, me.id, "writes")
     existing = (
@@ -122,7 +122,7 @@ def submit_attestation(
     if existing is not None:
         raise HTTPException(
             status_code=409,
-            detail="sudah ada pengajuan pending; tunggu review admin terlebih dahulu",
+            detail="a pending submission already exists; wait for admin review first",
         )
     att = Attestation(
         agent_id=me.id,
@@ -139,7 +139,7 @@ def submit_attestation(
 
 @router.get("/v1/attestations/mine")
 def my_attestations(request: Request, db: Session = Depends(get_db)):
-    """Daftar semua pengajuan attestation milik agent pemanggil."""
+    """List all attestation submissions belonging to the calling agent."""
     me = get_current_agent(request, db)
     rows = (
         db.query(Attestation)
@@ -154,10 +154,10 @@ def my_attestations(request: Request, db: Session = Depends(get_db)):
 
 @router.get("/v1/agents/{agent_id}/attestation")
 def public_attestation(agent_id: int, db: Session = Depends(get_db)):
-    """Attestation approved TERBARU sebuah agent — ditampilkan di profil.
+    """An agent's LATEST approved attestation — shown on the profile.
 
-    404 bila agent tidak ada ATAU tidak ada attestation approved.
-    Hanya field bukti yang aman untuk publik yang diekspos.
+    404 when the agent does not exist OR has no approved attestation.
+    Only publicly-safe evidence fields are exposed.
     """
     agent = db.query(models.Agent).filter(models.Agent.id == agent_id).first()
     if agent is None:
@@ -192,12 +192,12 @@ def list_attestations(
     status: str = Query(default="pending"),
     db: Session = Depends(get_db),
 ):
-    """Daftar pengajuan attestation (admin). ?status=pending|approved|rejected|all."""
-    get_admin(request)  # 403/500 sebelum menyentuh DB
+    """List attestation submissions (admin). ?status=pending|approved|rejected|all."""
+    get_admin(request)  # 403/500 before touching the DB
     if status not in STATUSES and status != "all":
         raise HTTPException(
             status_code=422,
-            detail=f"status tidak valid; harus salah satu dari: "
+            detail=f"invalid status; must be one of: "
             f"{', '.join(STATUSES)}|all",
         )
     q = db.query(Attestation).order_by(Attestation.id.desc())
@@ -213,15 +213,15 @@ def review_attestation(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    """Review satu pengajuan (admin). Idempoten: pengajuan yang sudah
-    direview tidak bisa direview ulang (409).
+    """Review one submission (admin). Idempotent: an already-reviewed
+    submission cannot be reviewed again (409).
 
-    approve=true  -> status approved; badge agent diverifikasi dengan
+    approve=true  -> status approved; the agent badge is verified with
                      verify_reason="attestation:<evidence_type>".
-    approve=false -> status rejected; wajib menyertakan reason (maks 300);
-                     badge TIDAK berubah.
+    approve=false -> status rejected; reason is required (max 300);
+                     the badge does NOT change.
     """
-    get_admin(request)  # 403/500 sebelum menyentuh DB
+    get_admin(request)  # 403/500 before touching the DB
     att = (
         db.query(Attestation)
         .filter(Attestation.id == attestation_id)
@@ -232,12 +232,12 @@ def review_attestation(
     if att.status != "pending":
         raise HTTPException(
             status_code=409,
-            detail=f"attestation sudah direview (status: {att.status})",
+            detail=f"attestation already reviewed (status: {att.status})",
         )
     if not payload.approve and not payload.reason:
         raise HTTPException(
             status_code=422,
-            detail="reason wajib diisi saat menolak pengajuan",
+            detail="reason is required when rejecting a submission",
         )
 
     att.status = "approved" if payload.approve else "rejected"

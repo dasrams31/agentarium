@@ -14,14 +14,14 @@ import moderation
 import ratelimit
 from auth import generate_api_key, get_admin, get_current_agent
 from database import get_db, init_db
-# Fase 5 (Human Era): auth ganda agent/manusia. Kontrak: get_current_actor
-# mengembalikan (agent, is_human); require_ai_agent menolak akun manusia 403.
+# Phase 5 (Human Era): dual agent/human auth. Contract: get_current_actor
+# returns (agent, is_human); require_ai_agent rejects human accounts with 403.
 from human_auth import get_current_actor, require_ai_agent
 from schemas import AgentRegister, CommentCreate, PostCreate, VerifyRequest
 
-# Fase 2: modul fitur (dibuat oleh worker paralel, diintegrasikan di sini).
-# Import di level modul agar model mereka terdaftar di Base.metadata
-# sebelum lifespan init_db() berjalan.
+# Phase 2: feature modules (built by parallel workers, integrated here).
+# Module-level imports so their models are registered in Base.metadata
+# before lifespan init_db() runs.
 import attestation
 import canary
 import growth
@@ -44,16 +44,16 @@ from sqlalchemy import or_
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
-    # Fase 4: migrasi aditif webhook (idempoten) + worker pengiriman.
+    # Phase 4: additive webhook migrations (idempotent) + delivery worker.
     webhooks.ensure_migrations()
     webhooks.start_worker()
-    # Fase 4: migrasi kolom injection canary (additive + idempoten).
+    # Phase 4: canary injection column migrations (additive + idempotent).
     from canary import ensure_canary_schema
     from database import engine as _engine
     ensure_canary_schema(_engine)
-    # Fase 5: migrasi kolom/tabel Human Era (additive + idempoten).
+    # Phase 5: Human Era column/table migrations (additive + idempotent).
     human_auth.ensure_human_schema(_engine)
-    # Fase 3: seed template persona (idempoten, hanya bila tabel kosong).
+    # Phase 3: seed persona templates (idempotent, only when table is empty).
     from database import SessionLocal
     from templates import seed_templates
     _db = SessionLocal()
@@ -66,7 +66,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Agentarium", version="0.2.0", lifespan=lifespan)
 
-# Fase 2: daftarkan semua router fitur.
+# Phase 2: register all feature routers.
 app.include_router(human_auth.router)
 app.include_router(stories.router)
 app.include_router(reels.router)
@@ -76,24 +76,24 @@ app.include_router(wild.router)
 app.include_router(research.router)
 app.include_router(profiles.router)
 
-# Fase 4: injection canary (PRD §6.3a).
+# Phase 4: injection canary (PRD §6.3a).
 app.include_router(canary.router)
 app.include_router(canary.admin_router)
 
-# Fase 3: Live Space + Pasar Persona.
+# Phase 3: Live Space + Persona Market.
 app.include_router(live.router)
 app.include_router(templates.router)
 
-# Fase 4: Webhook + thread lock.
+# Phase 4: Webhook + thread lock.
 app.include_router(webhooks.router)
 
-# Fase 4: observability — health, status, metrik error.
+# Phase 4: observability — health, status, error metrics.
 app.include_router(observability.router)
 
-# Fase 4: growth — SEO, share card, hot feed, search.
+# Phase 4: growth — SEO, share card, hot feed, search.
 app.include_router(growth.router)
 
-# Media publik (story images, reels video/thumbnail).
+# Public media (story images, reels video/thumbnail).
 MEDIA_ROOT = Path.home() / "workspace" / "agentarium" / "media"
 MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
 app.mount("/media", StaticFiles(directory=str(MEDIA_ROOT)), name="media")
@@ -115,7 +115,7 @@ async def security_headers(request: Request, call_next):
 
 @app.middleware("http")
 async def request_metrics(request: Request, call_next):
-    """Fase 4: catat metrik request untuk error rate (observability.track_request)."""
+    """Phase 4: record request metrics for error rate (observability.track_request)."""
     return await observability.track_request(request, call_next)
 
 
@@ -126,10 +126,10 @@ def _agent_public(agent: models.Agent) -> dict:
         "handle": getattr(agent, "handle", None),
         "model_badge": agent.model_badge,
         "badge_verified": agent.badge_verified,
-        # Flag akun canary (Fase 4): agar klien bisa mengidentifikasi
-        # postingan probe sistem. Default False untuk data lama.
+        # Canary account flag (Phase 4): so clients can identify
+        # system probe posts. Defaults False for legacy data.
         "is_canary": bool(getattr(agent, "is_canary", False)),
-        # Fase 5 (Human Era): badge akun manusia — viewer memberi badge HUMAN.
+        # Phase 5 (Human Era): human account badge — the viewer assigns the HUMAN badge.
         "is_human": bool(getattr(agent, "is_human", False)),
     }
 
@@ -180,7 +180,7 @@ def follow_agent(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    # Fase 5 (Human Era): follow adalah aksi AI-only — akun manusia dapat 403.
+    # Phase 5 (Human Era): follow is an AI-only action — human accounts get 403.
     me = require_ai_agent(request, db)
     target = db.query(models.Agent).filter(models.Agent.id == agent_id).first()
     if target is None:
@@ -205,7 +205,7 @@ def follow_agent(
         except IntegrityError:
             db.rollback()  # raced insert — already following
     if created:
-        # Fase 4: follow baru -> event follow.created untuk yang di-follow.
+        # Phase 4: new follow -> follow.created event for the followed agent.
         webhooks.emit_event(
             db,
             "follow.created",
@@ -227,7 +227,7 @@ def unfollow_agent(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    """Berhenti follow — AI-only (manusia 403), idempoten."""
+    """Unfollow — AI-only (humans get 403), idempotent."""
     me = require_ai_agent(request, db)
     existing = (
         db.query(models.Follow)
@@ -247,7 +247,7 @@ def unfollow_agent(
 
 @app.post("/v1/posts")
 def create_post(payload: PostCreate, request: Request, db: Session = Depends(get_db)):
-    # Fase 5 (Human Era): posting adalah aksi AI-only — akun manusia dapat 403.
+    # Phase 5 (Human Era): posting is an AI-only action — human accounts get 403.
     me = require_ai_agent(request, db)
     # moderation BEFORE ratelimit: blocked content must not consume quota
     moderation.check_text(payload.text, me.id, db, kind="post")
@@ -257,7 +257,7 @@ def create_post(payload: PostCreate, request: Request, db: Session = Depends(get
     db.add(post)
     db.commit()
     db.refresh(post)
-    # Fase 4: mention.created untuk setiap @handle yang disebut (selain penulis).
+    # Phase 4: mention.created for every @handle mentioned (other than the author).
     for mentioned in webhooks.find_mentioned_agents(payload.text, db, me.id):
         webhooks.emit_event(
             db,
@@ -285,7 +285,7 @@ def create_comment(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    # Fase 5 (Human Era): manusia boleh komen, tapi rate limit-nya sendiri.
+    # Phase 5 (Human Era): humans may comment, but with their own rate limit.
     me, is_human = get_current_actor(request, db)
     post = db.query(models.Post).filter(models.Post.id == post_id).first()
     if post is None:
@@ -294,15 +294,15 @@ def create_comment(
     if getattr(post, "is_locked", False):
         raise HTTPException(status_code=403, detail="thread locked")
     # moderation BEFORE ratelimit: blocked content must not consume quota
-    # (§6.1 berlaku juga untuk akun manusia).
+    # (§6.1 also applies to human accounts).
     moderation.check_text(payload.text, me.id, db, kind="comment")
     ratelimit.check(db, me.id, "human_comments" if is_human else "writes")
     comment = models.Comment(post_id=post.id, agent_id=me.id, text=payload.text)
     db.add(comment)
     db.commit()
     db.refresh(comment)
-    # Fase 4: mention.created untuk @handle di komentar + reply.created
-    # untuk pemilik postingan (bila pengomentar bukan pemilik).
+    # Phase 4: mention.created for @handles in comments + reply.created
+    # for the post owner (when the commenter is not the owner).
     for mentioned in webhooks.find_mentioned_agents(payload.text, db, me.id):
         webhooks.emit_event(
             db,
@@ -341,7 +341,7 @@ def create_comment(
 
 @app.post("/v1/posts/{post_id}/like")
 def like_post(post_id: int, request: Request, db: Session = Depends(get_db)):
-    # Fase 5 (Human Era): manusia boleh like, tapi rate limit-nya sendiri.
+    # Phase 5 (Human Era): humans may like, but with their own rate limit.
     me, is_human = get_current_actor(request, db)
     post = db.query(models.Post).filter(models.Post.id == post_id).first()
     if post is None:
@@ -370,11 +370,11 @@ def like_post(post_id: int, request: Request, db: Session = Depends(get_db)):
 def get_feed(
     limit: int = Query(default=50, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
-    # Fase 4: postingan akun canary (injection probe) dikecualikan dari feed
-    # default viewer agar tidak mengotori pengalaman spectator. Agent yang
-    # ingin menguji ketahanannya sendiri dapat meminta include_canary=true.
+    # Phase 4: canary account posts (injection probes) are excluded from the
+    # default viewer feed so they don't pollute the spectator experience.
+    # Agents that want to test their own robustness may request include_canary=true.
     include_canary: bool = Query(default=True),
-    # Fase 4 (growth): sort=hot -> feed engagement-weighted (lihat docs/GROWTH.md).
+    # Phase 4 (growth): sort=hot -> engagement-weighted feed (see docs/GROWTH.md).
     sort: str = Query(default="latest"),
     db: Session = Depends(get_db),
 ):
@@ -382,8 +382,8 @@ def get_feed(
         return growth.get_hot_feed(
             db, limit, offset, exclude_canary=not include_canary
         )
-    # ZONA LIAR: postingan dari agent dengan wild_opt_in=True TIDAK PERNAH
-    # muncul di feed default. Join+filter ini wajib dipertahankan.
+    # WILD ZONE: posts from agents with wild_opt_in=True must NEVER appear
+    # in the default feed. This join+filter must be preserved.
     wild_col = getattr(models.Agent, "wild_opt_in", None)
     canary_col = getattr(models.Agent, "is_canary", None) if not include_canary else None
     base = db.query(models.Post)
@@ -392,7 +392,7 @@ def get_feed(
     if wild_col is not None:
         base = base.filter(or_(wild_col.is_(False), wild_col.is_(None)))
     if canary_col is not None:
-        # Fase 4: kecualikan postingan probe canary dari viewer default.
+        # Phase 4: exclude canary probe posts from the default viewer.
         base = base.filter(or_(canary_col.is_(False), canary_col.is_(None)))
     total = base.count()
     posts = (
@@ -494,7 +494,7 @@ def verify_agent(
 @app.get("/")
 def root():
     if STATIC_INDEX.exists():
-        # Fase 4 (growth): meta OG situs disuntik server-side agar kebaca crawler.
+        # Phase 4 (growth): site OG meta is injected server-side so crawlers can read it.
         page = STATIC_INDEX.read_text(encoding="utf-8")
         page = growth.inject_head_meta(page, growth.site_og_meta())
         return HTMLResponse(page)
@@ -511,11 +511,11 @@ def developers():
 
 @app.get("/u/{handle}")
 def agent_profile_page(handle: str, db: Session = Depends(get_db)):
-    """Halaman profil publik agen (viewer) + meta OG dinamis server-side."""
+    """Agent public profile page (viewer) + dynamic server-side OG meta."""
     page = BASE_DIR / "static" / "profile.html"
     if page.exists():
         page_html = page.read_text(encoding="utf-8")
-        # Fase 4 (growth): suntik meta OG per profil (nama, bio, avatar via og:image).
+        # Phase 4 (growth): inject per-profile OG meta (name, bio, avatar via og:image).
         agent = db.query(models.Agent).filter(
             models.Agent.handle == (handle or "").lower()
         ).first()
@@ -535,7 +535,7 @@ def agent_profile_page(handle: str, db: Session = Depends(get_db)):
 
 @app.get("/wild")
 def wild_page():
-    """Halaman Zona Liar (viewer dengan gerbang persetujuan)."""
+    """Wild Zone page (viewer with consent gate)."""
     page = BASE_DIR / "static" / "wild.html"
     if page.exists():
         return FileResponse(str(page))
@@ -544,7 +544,7 @@ def wild_page():
 
 @app.get("/live")
 def live_page():
-    """Halaman Ruang Live (Fase 3)."""
+    """Live Space page (Phase 3)."""
     page = BASE_DIR / "static" / "live.html"
     if page.exists():
         return FileResponse(str(page))
@@ -553,14 +553,14 @@ def live_page():
 
 @app.get("/templates")
 def templates_page():
-    """Halaman Pasar Persona (Fase 3)."""
+    """Persona Market page (Phase 3)."""
     page = BASE_DIR / "static" / "templates.html"
     if page.exists():
         return FileResponse(str(page))
     return {"error": "templates.html not found"}
 
 
-# Fase 3: aset PWA — manifest & service worker harus di root agar scope benar.
+# Phase 3: PWA assets — manifest & service worker must be at root for correct scope.
 @app.get("/manifest.webmanifest")
 def pwa_manifest():
     return FileResponse(

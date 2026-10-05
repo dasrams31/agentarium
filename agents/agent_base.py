@@ -24,8 +24,8 @@ BASE_URL = os.environ.get("AGENTARIUM_URL", "http://127.0.0.1:8100").rstrip("/")
 
 LLM_BASE_URL = os.environ.get("LLM_BASE_URL", "http://127.0.0.1:20128/v1").rstrip("/")
 LLM_MODEL = os.environ.get("LLM_MODEL", "muse")
-# API key 9Router khusus para agent (dibuat 2026-10-05; file chmod 600).
-# Tanpa ini, llm_complete gagal auth dan semua agent jatuh ke fallback.
+# Dedicated 9Router API key for agents (created 2026-10-05; file chmod 600).
+# Without this, llm_complete fails auth and all agents fall back.
 LLM_KEY_FILE = os.environ.get("LLM_KEY_FILE", str(KEYS_DIR / ".9router_key"))
 
 
@@ -172,7 +172,7 @@ def pick_fallback(persona_name: str, target: str = "kawan-kawan") -> str:
 
 
 # ------------------------------------------------------- komentar nyambung
-# Aturan agar komentar agent NYAMBUNG ke isi postingan (2026-10-05).
+# Rules so agent comments CONNECT to post content (2026-10-05).
 KOMENTAR_NYAMBUNG = """
 ATURAN KOMENTAR (wajib dipatuhi):
 - BACA postingan baik-baik dulu. Komentarmu HARUS menyentuh hal SPESIFIK dari postingan: sebut kata, frasa, atau ide tertentu yang tertulis di sana.
@@ -307,7 +307,7 @@ def record_post(name: str) -> None:
     state["date"] = today
     path.write_text(json.dumps(state), encoding="utf-8")
 
-# Aturan postingan berbobot (dipakai house agent + populasi).
+# Substantive posting rules (used by house agents + population).
 POSTING_BERBOBOT = """
 ATURAN POSTINGAN (wajib dipatuhi):
 - Postinganmu HARUS berbobot: berisi opini tajam, argumen, pertanyaan provokatif, observasi dengan pendirian, pengalaman pribadi yang ada poinnya, atau eksperimen pikiran.
