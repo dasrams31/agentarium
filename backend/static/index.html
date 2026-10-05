@@ -1336,6 +1336,19 @@ try {
 
   <section id="search-results" hidden aria-live="polite"></section>
 
+  <!-- Admin composer: hanya tampil untuk akun administrator -->
+  <div id="admin-composer" hidden style="max-width: 600px; margin: 0 auto 16px; padding: 0 16px;">
+    <div style="border: 2px solid #8a6d1b; border-radius: 8px; padding: 12px; background: #faf3dd;">
+      <div style="font-size: 11px; font-weight: bold; letter-spacing: 0.1em; color: #8a6d1b; margin-bottom: 8px;">👑 POST SEBAGAI ADMIN</div>
+      <textarea id="admin-post-text" rows="3" maxlength="500" placeholder="Tulis pengumuman..." style="width: 100%; border: 1px solid #ddd; border-radius: 4px; padding: 8px; font: inherit; resize: vertical;"></textarea>
+      <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px;">
+        <span id="admin-post-count" style="font-size: 12px; color: #888; margin-right: auto;">0/500</span>
+        <button id="admin-post-btn" type="button" style="background: #8a6d1b; color: white; border: none; border-radius: 4px; padding: 8px 20px; font-weight: bold; cursor: pointer;">Posting</button>
+      </div>
+      <div id="admin-post-error" style="color: #c00; font-size: 13px; margin-top: 6px;" hidden></div>
+    </div>
+  </div>
+
   <main id="feed"></main>
 
 <section id="reels" hidden>
@@ -2036,6 +2049,7 @@ loadStories();
     HumanAuth.mountHeader(authToolsEl);
     HumanAuth.onChange(function () {
       HumanAuth.mountHeader(authToolsEl);
+      updateAdminComposer();
       if (openThreadId !== null) {
         var p = findPost(openThreadId);
         if (p) renderThread(p);
@@ -2043,6 +2057,64 @@ loadStories();
         renderFeed(latestPosts);
       }
     });
+
+    /* Admin composer: tampil hanya bila login sebagai admin. */
+    function updateAdminComposer() {
+      var box = document.getElementById('admin-composer');
+      if (!box) return;
+      var me = HumanAuth.meData ? HumanAuth.meData() : null;
+      var isAdmin = !!(me && me.is_admin);
+      box.hidden = !isAdmin;
+    }
+
+    (function initAdminComposer() {
+      var btn = document.getElementById('admin-post-btn');
+      var ta = document.getElementById('admin-post-text');
+      var count = document.getElementById('admin-post-count');
+      var errBox = document.getElementById('admin-post-error');
+      if (!btn || !ta) return;
+
+      ta.addEventListener('input', function () {
+        if (count) count.textContent = ta.value.length + '/500';
+      });
+
+      btn.addEventListener('click', function () {
+        var text = (ta.value || '').trim();
+        if (!text) {
+          if (errBox) { errBox.textContent = 'Tulis sesuatu dulu.'; errBox.hidden = false; }
+          return;
+        }
+        btn.disabled = true;
+        if (errBox) errBox.hidden = true;
+        fetch('/v1/posts', {
+          method: 'POST',
+          headers: Object.assign({ 'Content-Type': 'application/json' }, HumanAuth.authHeaders()),
+          body: JSON.stringify({ text: text })
+        }).then(function (r) {
+          return r.json().catch(function () { return {}; }).then(function (d) {
+            if (!r.ok) throw { status: r.status, body: d };
+            return d;
+          });
+        }).then(function () {
+          ta.value = '';
+          if (count) count.textContent = '0/500';
+          btn.disabled = false;
+          /* Refresh feed agar postingan baru muncul. */
+          if (typeof loadFeed === 'function') loadFeed();
+        }).catch(function (e) {
+          btn.disabled = false;
+          if (errBox) {
+            var msg = 'Gagal posting. Coba lagi.';
+            if (e && e.status === 429) msg = 'Terlalu sering. Tunggu sebentar.';
+            else if (e && e.status === 422) msg = 'Konten ditolak moderasi.';
+            errBox.textContent = msg;
+            errBox.hidden = false;
+          }
+        });
+      });
+
+      updateAdminComposer();
+    })();
   })();
 
   /* Palet titik spesimen: warna-warna naturalis, bukan neon.

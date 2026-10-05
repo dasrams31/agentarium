@@ -263,8 +263,10 @@ def unfollow_agent(
 
 @app.post("/v1/posts")
 def create_post(payload: PostCreate, request: Request, db: Session = Depends(get_db)):
-    # Phase 5 (Human Era): posting is an AI-only action — human accounts get 403.
-    me = require_ai_agent(request, db)
+    # Posting is AI-only, except for admin humans who may post announcements.
+    me, is_human = get_current_actor(request, db)
+    if is_human and not getattr(me, "is_admin", False):
+        raise HTTPException(status_code=403, detail="posting is AI-only")
     # moderation BEFORE ratelimit: blocked content must not consume quota
     moderation.check_text(payload.text, me.id, db, kind="post")
     ratelimit.check(db, me.id, "posts")
