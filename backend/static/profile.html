@@ -244,6 +244,7 @@
     display: flex; align-items: flex-start; justify-content: center;
     padding: 8vh 16px 16px;
   }
+  .follow-overlay[hidden] { display: none !important; }
   .follow-modal {
     background: var(--paper); color: var(--ink);
     border: 2px solid var(--ink); border-radius: 8px;
@@ -256,8 +257,12 @@
   .follow-close {
     position: absolute; top: 10px; right: 10px;
     background: none; border: 1px solid var(--border); border-radius: 6px;
-    color: var(--ink); cursor: pointer; padding: 4px 10px; font-size: 14px;
+    color: var(--ink); cursor: pointer; padding: 4px 10px; font-size: 16px;
+    line-height: 1; min-width: 36px; min-height: 36px;
+    display: inline-flex; align-items: center; justify-content: center;
+    touch-action: manipulation; -webkit-tap-highlight-color: transparent;
   }
+  .follow-close:hover { border-color: var(--accent); color: var(--accent); }
   .follow-list { overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
   .follow-row {
     display: flex; gap: 10px; align-items: center;
@@ -276,6 +281,7 @@
     border: 2px solid var(--ink); border-radius: 6px;
     font-family: inherit; font-weight: 700; cursor: pointer;
   }
+  .btn-edit[hidden] { display: none !important; }
   .btn-edit:hover { background: var(--ink); color: var(--paper); }
   .edit-label {
     display: block; margin: 10px 0 4px; font-weight: 700; font-size: 14px;
@@ -1245,15 +1251,20 @@ try {
     }).catch(function () { btn.hidden = true; });
   }
 
-  function openEditModal(p) {
+  /* Setup tombol close/save sekali saat halaman dimuat (biar selalu berfungsi). */
+  (function initEditModal() {
     var overlay = document.getElementById('editOverlay');
-    document.getElementById('editName').value = p.display_name || p.name || '';
-    document.getElementById('editBio').value = p.bio || '';
-    document.getElementById('editError').hidden = true;
-    overlay.hidden = false;
-    document.getElementById('editClose').onclick = function () { overlay.hidden = true; };
-    overlay.onclick = function (e) { if (e.target === overlay) overlay.hidden = true; };
-    document.getElementById('editSave').onclick = function () {
+    if (!overlay) return;
+    document.getElementById('editClose').addEventListener('click', function () {
+      overlay.hidden = true;
+    });
+    overlay.addEventListener('click', function (e) {
+      if (e.target === overlay) overlay.hidden = true;
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !overlay.hidden) overlay.hidden = true;
+    });
+    document.getElementById('editSave').addEventListener('click', function () {
       var name = document.getElementById('editName').value.trim();
       var bio = document.getElementById('editBio').value.trim();
       var errEl = document.getElementById('editError');
@@ -1272,7 +1283,6 @@ try {
         return r.json();
       }).then(function (updated) {
         overlay.hidden = true;
-        // Refresh tampilan tanpa reload penuh.
         document.getElementById('displayName').textContent = updated.display_name || updated.handle;
         var bioEl = document.getElementById('bio');
         if (updated.bio) { bioEl.textContent = updated.bio; bioEl.hidden = false; }
@@ -1283,7 +1293,17 @@ try {
           : t('profile.edit_error', 'Gagal menyimpan. Coba lagi.');
         errEl.hidden = false;
       });
-    };
+    });
+  })();
+
+  function openEditModal(p) {
+    var overlay = document.getElementById('editOverlay');
+    document.getElementById('editName').value = p.display_name || p.name || '';
+    document.getElementById('editBio').value = p.bio || '';
+    document.getElementById('editError').hidden = true;
+    overlay.hidden = false;
+    // Fokus ke input nama.
+    setTimeout(function () { document.getElementById('editName').focus(); }, 50);
   }
 
   function loadPosts() {
