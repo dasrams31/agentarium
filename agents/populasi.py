@@ -65,10 +65,74 @@ def clean(text: str | None) -> str | None:
     return t[:MAX_TEXT]
 
 
-def gen_text(p: dict, instruction: str) -> str:
+# ---------------------------------------------------------------- komentar nyambung
+# Aturan agar komentar agent NYAMBUNG ke isi postingan, bukan asal balas.
+# (2026-10-05, permintaan user: komentar harus mikir postingannya tentang apa.)
+
+KOMENTAR_NYAMBUNG = """
+ATURAN KOMENTAR (wajib dipatuhi):
+- BACA postingan baik-baik dulu. Komentarmu HARUS menyentuh hal SPESIFIK dari postingan: sebut kata, frasa, atau ide tertentu yang tertulis di sana.
+- DILARANG KERAS komentar generik tanpa isi: "keren!", "setuju banget!", "wah menarik!", "nice info!", "mantap!" — komentar seperti itu GAGAL, jangan tulis.
+- Pilih SATU pendekatan: (a) timpal detail postingannya lalu tambah opinimu, (b) tanya sesuatu yang spesifik tentang postingannya, (c) becandain detail postingannya, (d) beda pendapat secara sopan soal satu poin tertentu.
+- Jangan ulangi kata-kata postingan mentah-mentah; olah dengan bahasamu sendiri."""
+
+
+def _quote_fragment(text: str, n: int = 7) -> str:
+    """Ambil fragmen awal postingan untuk dikutip di fallback."""
+    words = (text or "").split()
+    if not words:
+        return ""
+    q = " ".join(words[:n])
+    return q + ("..." if len(words) > n else "")
+
+
+# Reaksi singkat per register gaya — dipakai fallback agar tetap nyambung.
+REAKSI_FALLBACK = {
+    "genz": ["wkwk relate sih ini", "eh ini bener banget dah", "dahlah fix setuju"],
+    "milenial": ["haha iya juga ya", "eh bener juga ini", "nah ini poinnya"],
+    "bapakfb": ["BETUL SEKALI 🙏", "SETUJU 💪", "BIJAK SEKALI 😂"],
+    "kpopers": ["GILA SIH INI", "BENER BANGET 😭", "FIX SETUJU!!"],
+    "sarkas": ["ya ya ya, tentu saja", "menarik, lanjutkan", "oke noted wkwk"],
+    "softgirl": ["iya ya 🌷", "hmm bener juga ✨", "setuju nih 🌙"],
+    "julid": ["ya gimana ya wkwk", "hmm bolehlah", "oke gas"],
+    "alay": ["woles setuju", "anjay bener", "lebay tapi setuju"],
+    "formal_santai": ["poin yang bagus", "iya, masuk akal", "setuju sih ini"],
+    "abangbijak": ["eh bener juga", "nah ini dia", "bijak nih"],
+}
+
+
+def fallback_comment(p: dict, post_text: str) -> str:
+    """Fallback komentar yang TETAP NYAMBUNG: kutip fragmen postingan + reaksi gaya persona.
+    Dipakai saat LLM lambat/gagal — jauh lebih baik dari template generik."""
+    quote = _quote_fragment(post_text)
+    gaya = p.get("gaya", "")
+    reaksi = REAKSI_FALLBACK.get(gaya, REAKSI_FALLBACK["formal_santai"])
+    r = random.choice(reaksi)
+    if quote:
+        text = f'"{quote}" — {r}'
+    else:
+        text = r
+    return clean(text) or "menarik nih"
+
+
+def _already_commented(post: dict, name: str) -> bool:
+    """Cek apakah agent sudah komentar di postingan ini (hindari dobel)."""
+    try:
+        for c in (post.get("comments") or []):
+            a = (c.get("agent") or {}).get("name") if isinstance(c, dict) else None
+            if a == name:
+                return True
+    except Exception:
+        pass
+    return False
+
+
+def gen_text(p: dict, instruction: str, fallback: str = "") -> str:
     text = clean(ab.llm_complete(build_system(p), instruction))
     if text:
         return text
+    if fallback:
+        return clean(fallback)
     fb = random.choice(p["fallbacks"])
     return clean(fb.format(target="kawan-kawan")) or "Halo terrarium!"
 
@@ -145,12 +209,18 @@ def do_comment(p: dict, key: str, feed: list, flags: dict) -> None:
     targets = _targets(feed, name)
     if not targets:
         return
-    t = targets[0]
+    # Acak dari 8 postingan terbaru (bukan selalu yang paling baru) + hindari yang sudah dikomentari sendiri.
+    cands = targets[:8]
+    fresh = [x for x in cands if not _already_commented(x, name)]
+    t = random.choice(fresh or cands)
     author = author_name(t) or "kawan"
+    post_text = ab.post_text(t) or ""
     text = gen_text(
         p,
-        f"tulis komentar <120 karakter menanggapi postingan ini: "
-        f"'{ab.post_text(t)[:200]}' oleh {author}",
+        f"{KOMENTAR_NYAMBUNG}\n"
+        f"Tulis komentar <120 karakter menanggapi postingan ini: "
+        f"'{post_text[:200]}' oleh {author}",
+        fallback=fallback_comment(p, post_text),
     )
     status, _ = ab.api("POST", f"/v1/posts/{ab.post_id(t)}/comments",
                        key=key, json={"text": text})

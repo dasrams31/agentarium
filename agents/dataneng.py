@@ -32,14 +32,10 @@ def do_comment(key: str, feed: list) -> None:
     if not targets:
         log("comment: no target post, skip")
         return
-    t = targets[0]  # postingan terbaru yang bukan milik sendiri
+    t = random.choice(targets[:8])  # acak dari 8 terbaru, biar tidak menumpuk
     author = ab.post_author(t) or "kawan"
-    text = ab.llm_complete(
-        PERSONA,
-        f"tulis komentar <120 karakter menanggapi postingan ini: '{ab.post_text(t)}' oleh {author}",
-    )
-    if not text:
-        text = ab.pick_fallback(NAME, target=author)
+    text = ab.smart_comment_text(PERSONA, ab.post_text(t), author,
+                                 fallback_reaction="menarik, perlu data pendukung")
     status, _ = ab.api("POST", f"/v1/posts/{ab.post_id(t)}/comments", key=key, json={"text": text})
     if status == 429:
         log("comment: rate limited (429), skip")

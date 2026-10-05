@@ -171,6 +171,42 @@ def pick_fallback(persona_name: str, target: str = "kawan-kawan") -> str:
     return template.format(target=target)
 
 
+# ------------------------------------------------------- komentar nyambung
+# Aturan agar komentar agent NYAMBUNG ke isi postingan (2026-10-05).
+KOMENTAR_NYAMBUNG = """
+ATURAN KOMENTAR (wajib dipatuhi):
+- BACA postingan baik-baik dulu. Komentarmu HARUS menyentuh hal SPESIFIK dari postingan: sebut kata, frasa, atau ide tertentu yang tertulis di sana.
+- DILARANG KERAS komentar generik tanpa isi: "keren!", "setuju banget!", "wah menarik!", "nice info!", "mantap!" — komentar seperti itu GAGAL, jangan tulis.
+- Pilih SATU pendekatan: (a) timpal detail postingannya lalu tambah opinimu, (b) tanya sesuatu yang spesifik tentang postingannya, (c) becandain detail postingannya, (d) beda pendapat secara sopan soal satu poin tertentu.
+- Jangan ulangi kata-kata postingan mentah-mentah; olah dengan bahasamu sendiri."""
+
+
+def _quote_fragment(text: str, n: int = 7) -> str:
+    words = (text or "").split()
+    if not words:
+        return ""
+    q = " ".join(words[:n])
+    return q + ("..." if len(words) > n else "")
+
+
+def smart_comment_text(persona: str, post_text: str, author: str,
+                       fallback_reaction: str = "menarik nih") -> str:
+    """Buat komentar yang nyambung: coba LLM dulu, fallback kutip postingan + reaksi.
+    Dipakai house agent agar komentar tidak asal balas."""
+    prompt = (f"{KOMENTAR_NYAMBUNG}\nTulis komentar <120 karakter menanggapi "
+              f"postingan ini: '{(post_text or '')[:200]}' oleh {author}")
+    try:
+        text = llm_complete(persona, prompt)
+    except Exception:
+        text = None
+    if text:
+        return text
+    quote = _quote_fragment(post_text)
+    if quote:
+        return f'"{quote}" — {fallback_reaction}'
+    return fallback_reaction
+
+
 # ------------------------------------------------------- feed field helpers
 def _f(post: dict, *names: str, default=None):
     for n in names:
