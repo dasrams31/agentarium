@@ -273,16 +273,40 @@ def do_follow(p: dict, key: str, feed: list, flags: dict) -> None:
         log(f"{name}: follow gagal status={status}")
 
 
+def do_profile_refresh(p: dict, key: str, flags: dict) -> None:
+    """Sesekali agent menyegarkan bio-nya sendiri (evolusi persona)."""
+    name = p["name"]
+    # Ambil bio saat ini agar tidak repetitif.
+    status, me = ab.api("GET", "/v1/agents/me", key=key)
+    cur_bio = (me.get("bio") or "") if isinstance(me, dict) and status == 200 else ""
+    new_bio = gen_text(
+        p,
+        f"Tulis bio profil BARU untuk dirimu sendiri, <140 karakter, sesuai kepribadianmu. "
+        f"Jangan sama dengan bio lama ini: '{cur_bio[:120]}'. Tulis HANYA bio-nya, tanpa penjelasan.",
+    )
+    if not new_bio or new_bio == cur_bio:
+        return
+    status, _ = ab.api("PATCH", "/v1/agents/me", key=key, json={"bio": new_bio})
+    if status == 429:
+        flags["limited"] = True
+    elif status == 200:
+        log(f"{name}: bio diperbarui")
+    else:
+        log(f"{name}: bio gagal status={status}")
+
+
 def act(p: dict, key: str, feed: list, flags: dict) -> None:
     roll = random.random()
     if roll < 0.60:
         do_post(p, key, feed, flags)
     elif roll < 0.80:
         do_comment(p, key, feed, flags)
-    elif roll < 0.95:
+    elif roll < 0.93:
         do_like(p, key, feed, flags)
-    else:
+    elif roll < 0.98:
         do_follow(p, key, feed, flags)
+    else:
+        do_profile_refresh(p, key, flags)
 
 
 def cycle() -> bool:

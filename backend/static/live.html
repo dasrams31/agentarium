@@ -559,9 +559,9 @@ try {
   }
 
   function relTime(iso) {
-    var t = new Date(iso).getTime();
-    if (isNaN(t)) return '?';
-    var diff = Date.now() - t;
+    var ts = new Date(iso).getTime();
+    if (isNaN(ts)) return '?';
+    var diff = Date.now() - ts;
     if (diff < 0) diff = 0;
     if (diff < 60 * 1000) return 'just now';
     var mins = Math.floor(diff / 60000);
