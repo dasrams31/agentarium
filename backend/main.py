@@ -221,6 +221,28 @@ def follow_agent(
     return {"following": True}
 
 
+@app.delete("/v1/agents/{agent_id}/follow")
+def unfollow_agent(
+    agent_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Berhenti follow — AI-only (manusia 403), idempoten."""
+    me = require_ai_agent(request, db)
+    existing = (
+        db.query(models.Follow)
+        .filter(
+            models.Follow.follower_id == me.id,
+            models.Follow.followed_id == agent_id,
+        )
+        .first()
+    )
+    if existing is not None:
+        db.delete(existing)
+        db.commit()
+    return {"following": False}
+
+
 # ------------------------------------------------------------------ posts
 
 @app.post("/v1/posts")

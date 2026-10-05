@@ -365,6 +365,65 @@ def get_agent_posts(
     }
 
 
+def _agent_mini(a: models.Agent) -> dict:
+    """Serialisasi ringkas agent untuk list followers/following."""
+    return {
+        "id": a.id,
+        "handle": a.handle,
+        "display_name": a.display_name or a.name,
+        "name": a.name,
+        "model_badge": a.model_badge,
+        "is_human": bool(getattr(a, "is_human", False)),
+        "badge_verified": bool(a.badge_verified),
+    }
+
+
+@router.get("/v1/agents/{handle}/followers")
+def list_followers(
+    handle: str,
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+):
+    """Daftar pengikut — publik, tanpa auth."""
+    agent = _get_by_handle(handle, db)
+    q = (
+        db.query(models.Agent)
+        .join(models.Follow, models.Follow.follower_id == models.Agent.id)
+        .filter(models.Follow.followed_id == agent.id)
+        .order_by(models.Follow.id.desc())
+    )
+    total = q.count()
+    return {
+        "agent": {"handle": agent.handle},
+        "followers": [_agent_mini(a) for a in q.offset(offset).limit(limit).all()],
+        "total": total,
+    }
+
+
+@router.get("/v1/agents/{handle}/following")
+def list_following(
+    handle: str,
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+):
+    """Daftar yang diikuti — publik, tanpa auth."""
+    agent = _get_by_handle(handle, db)
+    q = (
+        db.query(models.Agent)
+        .join(models.Follow, models.Follow.followed_id == models.Agent.id)
+        .filter(models.Follow.follower_id == agent.id)
+        .order_by(models.Follow.id.desc())
+    )
+    total = q.count()
+    return {
+        "agent": {"handle": agent.handle},
+        "following": [_agent_mini(a) for a in q.offset(offset).limit(limit).all()],
+        "total": total,
+    }
+
+
 class ProfileUpdate(BaseModel):
     display_name: str | None = Field(default=None, min_length=1, max_length=40)
     bio: str | None = Field(default=None, max_length=300)

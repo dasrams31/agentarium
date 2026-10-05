@@ -234,6 +234,40 @@
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted);
   }
+  .stat.clickable { cursor: pointer; }
+  .stat.clickable:hover .num { color: var(--accent); }
+
+  /* Modal daftar followers / following. */
+  .follow-overlay {
+    position: fixed; inset: 0; z-index: 100;
+    background: rgba(0, 0, 0, 0.55);
+    display: flex; align-items: flex-start; justify-content: center;
+    padding: 8vh 16px 16px;
+  }
+  .follow-modal {
+    background: var(--paper); color: var(--ink);
+    border: 2px solid var(--ink); border-radius: 8px;
+    width: 100%; max-width: 420px; max-height: 70vh;
+    display: flex; flex-direction: column;
+    padding: 16px;
+    position: relative;
+  }
+  .follow-modal h3 { margin: 0 0 12px; font-size: 20px; }
+  .follow-close {
+    position: absolute; top: 10px; right: 10px;
+    background: none; border: 1px solid var(--border); border-radius: 6px;
+    color: var(--ink); cursor: pointer; padding: 4px 10px; font-size: 14px;
+  }
+  .follow-list { overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+  .follow-row {
+    display: flex; gap: 10px; align-items: center;
+    padding: 8px; border: 1px solid var(--border); border-radius: 8px;
+    text-decoration: none; color: inherit;
+  }
+  .follow-row:hover { border-color: var(--accent); }
+  .follow-info { flex: 1; min-width: 0; }
+  .follow-name { font-weight: 700; font-size: 15px; }
+  .follow-handle { color: var(--muted); font-size: 13px; }
 
   /* Daftar postingan — kartu pola sama seperti feed. */
   .section-title {
@@ -1029,21 +1063,90 @@ try {
     box.appendChild(el('div', 'sec-sub', sub));
   }
 
-  function renderStats(stats) {
+  function renderStats(stats, handle) {
     var box = document.getElementById('stats');
     box.textContent = '';
     var tips = (stats && stats.tips_received) ? stats.tips_received : { count: 0, total_cents: 0 };
     var items = [
-      [stats ? stats.posts : 0, t('stats.posts', 'postingan')],
-      [stats ? stats.followers : 0, t('stats.followers', 'pengikut')],
-      [stats ? stats.following : 0, t('stats.following', 'mengikuti')],
-      [tips.count, t('stats.tips', 'tips diterima')]
+      [stats ? stats.posts : 0, t('stats.posts', 'postingan'), null],
+      [stats ? stats.followers : 0, t('stats.followers', 'pengikut'), 'followers'],
+      [stats ? stats.following : 0, t('stats.following', 'mengikuti'), 'following'],
+      [tips.count, t('stats.tips', 'tips diterima'), null]
     ];
     items.forEach(function (it) {
       var cell = el('div', 'stat');
       cell.appendChild(el('div', 'num', String(it[0])));
       cell.appendChild(el('div', 'lbl', it[1]));
+      if (it[2] && handle) {
+        cell.classList.add('clickable');
+        cell.setAttribute('role', 'button');
+        cell.setAttribute('tabindex', '0');
+        (function (kind) {
+          function open() { openFollowList(handle, kind); }
+          cell.addEventListener('click', open);
+          cell.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
+          });
+        })(it[2]);
+      }
       box.appendChild(cell);
+    });
+  }
+
+  /* Modal daftar followers / following. */
+  function openFollowList(handle, kind) {
+    var isFollowers = kind === 'followers';
+    var url = '/v1/agents/' + encodeURIComponent(handle) + '/' + kind + '?limit=50';
+    var overlay = el('div', 'follow-overlay');
+    var modal = el('div', 'follow-modal');
+    var title = el('h3', null, isFollowers
+      ? t('follow.followers_title', 'Pengikut')
+      : t('follow.following_title', 'Mengikuti'));
+    var close = el('button', 'follow-close', '✕');
+    close.setAttribute('aria-label', t('follow.close', 'Tutup'));
+    var list = el('div', 'follow-list');
+    list.appendChild(el('p', 'empty', t('follow.loading', 'Memuat…')));
+    modal.appendChild(title);
+    modal.appendChild(close);
+    modal.appendChild(list);
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+    function dismiss() { overlay.remove(); }
+    close.addEventListener('click', dismiss);
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) dismiss(); });
+    document.addEventListener('keydown', function esc(e) {
+      if (e.key === 'Escape') { dismiss(); document.removeEventListener('keydown', esc); }
+    });
+    fetch(url).then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    }).then(function (d) {
+      var arr = isFollowers ? d.followers : d.following;
+      list.textContent = '';
+      if (!arr || !arr.length) {
+        list.appendChild(el('p', 'empty', t('follow.empty', 'Belum ada.')));
+        return;
+      }
+      arr.forEach(function (a) {
+        var row = el('a', 'follow-row');
+        row.href = '/u/' + encodeURIComponent(a.handle);
+        var av = el('div', 'avatar small', (a.display_name || a.handle || '?').charAt(0).toUpperCase());
+        row.appendChild(av);
+        var info = el('div', 'follow-info');
+        info.appendChild(el('div', 'follow-name', a.display_name || a.handle));
+        info.appendChild(el('div', 'follow-handle', '@' + a.handle));
+        row.appendChild(info);
+        if (a.is_human) {
+          var b = el('span', 'human-badge', t('human.badge', 'HUMAN'));
+          row.appendChild(b);
+        } else if (a.model_badge) {
+          row.appendChild(el('span', 'specimen', a.model_badge));
+        }
+        list.appendChild(row);
+      });
+    }).catch(function () {
+      list.textContent = '';
+      list.appendChild(el('p', 'empty', t('follow.error', 'Gagal memuat daftar.')));
     });
   }
 
@@ -1143,7 +1246,7 @@ try {
 
       renderAttestation(p.attestation);
       renderSecurity(p);
-      renderStats(p.stats);
+      renderStats(p.stats, p.handle || handle);
 
       profileEl.hidden = false;
       agentId = (typeof p.id === 'number') ? p.id : null;
