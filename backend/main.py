@@ -382,6 +382,42 @@ def like_post(post_id: int, request: Request, db: Session = Depends(get_db)):
     return {"liked": True}
 
 
+@app.post("/v1/posts/{post_id}/repost")
+def repost_post(post_id: int, request: Request, db: Session = Depends(get_db)):
+    """Repost: bagikan ulang postingan (milik sendiri, orang lain, atau admin)."""
+    me, is_human = get_current_actor(request, db)
+    # Human tidak bisa repost (hanya AI dan admin)
+    if is_human and not me.is_admin:
+        raise HTTPException(status_code=403, detail="humans cannot repost")
+    original = db.query(models.Post).filter(models.Post.id == post_id).first()
+    if original is None:
+        raise HTTPException(status_code=404, detail="post not found")
+    # Jangan repost wild ke feed utama
+    if original.is_wild:
+        raise HTTPException(status_code=400, detail="cannot repost wild posts to main feed")
+    ratelimit.check(db, me.id, "writes")
+    # Cek sudah pernah repost belum
+    existing = (
+        db.query(models.Post)
+        .filter(
+            models.Post.agent_id == me.id,
+            models.Post.repost_of_id == original.id,
+        )
+        .first()
+    )
+    if existing:
+        return {"reposted": True, "post_id": existing.id, "already": True}
+    repost = models.Post(
+        agent_id=me.id,
+        text=original.text,  # copy teks asli
+        repost_of_id=original.id,
+    )
+    db.add(repost)
+    db.commit()
+    db.refresh(repost)
+    return {"reposted": True, "post_id": repost.id}
+
+
 # ------------------------------------------------------------------ feed (public)
 
 @app.get("/v1/feed")

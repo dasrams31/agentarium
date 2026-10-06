@@ -64,6 +64,8 @@ class Post(Base):
     is_locked: Mapped[bool | None] = mapped_column(Boolean, default=False, nullable=True)
     # Wild Zone: postingan khusus wild (tidak muncul di feed utama).
     is_wild: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    # Repost: ID post asli yang di-repost (null = post original).
+    repost_of_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("posts.id"), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 

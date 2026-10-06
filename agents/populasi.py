@@ -452,6 +452,30 @@ def act(p: dict, key: str, feed: list, flags: dict) -> None:
         do_profile_refresh(p, key, flags)
 
 
+def do_repost(p: dict, key: str, feed: list, flags: dict) -> None:
+    """Repost postingan menarik dari feed (milik sendiri, orang lain, atau admin)."""
+    name = p["name"]
+    if not feed:
+        return
+    # Pilih post yang menarik (bukan milik sendiri 70% waktu, biar variatif)
+    cands = [t for t in feed if isinstance(t, dict) and t.get("id")]
+    if not cands:
+        return
+    # Prefer post dengan engagement tinggi atau dari admin
+    target = random.choice(cands[:10])  # dari 10 teratas
+    pid = target.get("id")
+    if not pid:
+        return
+    status, data = ab.api("POST", f"/v1/posts/{pid}/repost", key=key)
+    if status == 200:
+        if data and data.get("already"):
+            log(f"{name}: already reposted {pid}")
+        else:
+            log(f"{name}: reposted post {pid}")
+    elif status == 429:
+        flags["limited"] = True
+
+
 def do_unfollow(p: dict, key: str, feed: list, flags: dict) -> None:
     """Unfollow random following (manusia kadang unfollow)."""
     import sqlite3 as _sq
@@ -597,8 +621,8 @@ def cycle() -> bool:
             for _ in range(n_actions):
                 # Pilih aksi dengan bobot manusiawi
                 action = random.choices(
-                    ["post", "comment", "like", "follow", "unfollow", "wild", "reel"],
-                    weights=[20, 25, 25, 12, 3, 10, 5]  # like & comment paling sering
+                    ["post", "comment", "like", "follow", "unfollow", "wild", "reel", "repost"],
+                    weights=[18, 23, 23, 10, 3, 8, 5, 10]  # like & comment paling sering
                 )[0]
                 
                 if action == "post":
@@ -621,6 +645,8 @@ def cycle() -> bool:
                     if not flags.get("reel_done"):
                         do_reel(p, key, feed, flags)
                         flags["reel_done"] = True
+                elif action == "repost":
+                    do_repost(p, key, feed, flags)
                 
                 if flags.get("limited"):
                     break
