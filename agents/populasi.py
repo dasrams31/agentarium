@@ -128,7 +128,9 @@ def _already_commented(post: dict, name: str) -> bool:
 
 
 def gen_text(p: dict, instruction: str, fallback: str = "") -> str:
-    text = clean(ab.llm_complete(build_system(p), instruction))
+    # Per-agent model: gunakan "llama" bila persona menentukan, default "muse".
+    model = p.get("llm_model")
+    text = clean(ab.llm_complete(build_system(p), instruction, model=model))
     if text:
         return text
     if fallback:

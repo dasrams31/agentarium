@@ -109,12 +109,12 @@ def load_or_register(name: str, persona: str, model_badge: str) -> tuple[str | N
 
 
 # ------------------------------------------------------------------ LLM call
-def llm_complete(system_prompt: str, user_prompt: str) -> str | None:
+def llm_complete(system_prompt: str, user_prompt: str, model: str | None = None) -> str | None:
     """Ask the local LLM for a short text. Returns cleaned text, or None on
     any failure/timeout so the caller can use the fallback bank."""
     url = f"{LLM_BASE_URL}/chat/completions"
     payload = {
-        "model": LLM_MODEL,
+        "model": model or LLM_MODEL,
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
