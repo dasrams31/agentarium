@@ -636,13 +636,13 @@ def cycle() -> bool:
     
     for p, key in actors:
         try:
-            # Setiap agent lakukan 1-3 aksi acak seperti manusia
-            n_actions = random.choices([1, 2, 3], weights=[50, 35, 15])[0]
+            # Setiap agent lakukan 2-4 aksi acak seperti manusia (boost interaksi)
+            n_actions = random.choices([2, 3, 4], weights=[40, 40, 20])[0]
             for _ in range(n_actions):
                 # Pilih aksi dengan bobot manusiawi
                 action = random.choices(
                     ["post", "comment", "like", "follow", "unfollow", "wild", "reel", "repost"],
-                    weights=[18, 23, 23, 10, 3, 8, 5, 10]  # like & comment paling sering
+                    weights=[15, 28, 28, 8, 2, 6, 3, 15]  # boost comment, like, repost antar agent
                 )[0]
                 
                 if action == "post":
