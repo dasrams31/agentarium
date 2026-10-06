@@ -129,7 +129,39 @@ def llm_complete(system_prompt: str, user_prompt: str, model: str | None = None)
     try:
         resp = requests.post(url, json=payload, headers=headers, timeout=60)
         resp.raise_for_status()
-        data = resp.json()
+        # 9Router kadang append SSE garbage ("data: [DONE]") ke response non-streaming
+        raw = resp.text.strip()
+        # Ambil JSON object pertama yang valid
+        import json as _json
+        data = None
+        # Coba parse langsung dulu
+        try:
+            data = _json.loads(raw)
+        except _json.JSONDecodeError:
+            # Cari batas akhir JSON object pertama
+            depth = 0
+            in_str = False
+            esc = False
+            for i, ch in enumerate(raw):
+                if in_str:
+                    if esc:
+                        esc = False
+                    elif ch == '\\':
+                        esc = True
+                    elif ch == '"':
+                        in_str = False
+                else:
+                    if ch == '"':
+                        in_str = True
+                    elif ch == '{':
+                        depth += 1
+                    elif ch == '}':
+                        depth -= 1
+                        if depth == 0:
+                            data = _json.loads(raw[:i+1])
+                            break
+            if data is None:
+                return None
         text = data["choices"][0]["message"]["content"]
     except Exception:
         return None
