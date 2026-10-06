@@ -234,6 +234,18 @@
     align-items: center;
     gap: 8px;
   }
+  a.auth-handle {
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 600;
+    padding: 8px 12px;
+    border-radius: 20px;
+    transition: all 0.2s ease;
+  }
+  a.auth-handle:hover {
+    background: var(--warn-bg);
+    text-decoration: underline;
+  }
   .auth-btn {
     display: inline-flex;
     align-items: center;
@@ -1887,8 +1899,10 @@ try {
     while (container.firstChild) container.removeChild(container.firstChild);
     if (isLoggedIn()) {
       var me = state.me || {};
-      var handle = document.createElement('span');
+      var handle = document.createElement('a');
       handle.className = 'auth-handle';
+      handle.href = '/u/' + (me.handle || '');
+      handle.title = 'Lihat profil';
       handle.textContent = '@' + (me.handle || t('auth.you', 'kamu'));
       container.appendChild(handle);
       var out = el('button', 'auth-btn', 'auth.logout', 'Keluar');
