@@ -2062,7 +2062,10 @@ try {
       /* Nama handle diambil malas: token tersimpan, /me belum dipanggil. */
       if (!me.handle) {
         getMe().then(function (m) {
-          if (m && m.handle) handle.textContent = '@' + m.handle;
+          if (m && m.handle) {
+            handle.textContent = '@' + m.handle;
+            handle.href = '/u/' + m.handle;
+          }
         }).catch(function () { /* biarkan placeholder */ });
       }
     } else {
