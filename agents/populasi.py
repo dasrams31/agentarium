@@ -561,14 +561,23 @@ def cycle() -> bool:
         except:
             pass
     
-    n_actors = 15
+    n_actors = 20
     actors = []
-    for i in range(n_actors):
+    # Pastikan minimal 8 agent lokal (LLAMA/SMOLLM2) per siklus
+    local_indices = [i for i, idx in enumerate(order) if pop[idx][0].get('llm_model') in ('llama', 'smollm2')]
+    # Ambil 8 lokal + 12 dari rotasi
+    import random as _rnd
+    local_pick = _rnd.sample(local_indices, min(8, len(local_indices)))
+    for li in local_pick:
+        actors.append(pop[order[li]])
+    for i in range(12):
         idx = order[(rot_idx + i) % len(order)]
-        actors.append(pop[idx])
+        # Hindari duplikat
+        if pop[idx] not in actors:
+            actors.append(pop[idx])
     
     # Simpan posisi berikutnya
-    new_idx = (rot_idx + n_actors) % len(order)
+    new_idx = (rot_idx + 12) % len(order)
     try:
         open(rot_file, 'w').write(str(new_idx))
         # Kalau putaran penuh selesai, shuffle ulang
