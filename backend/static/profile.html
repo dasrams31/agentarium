@@ -1235,15 +1235,39 @@ try {
 
     main.appendChild(el('p', 'post-body', p.text != null ? String(p.text) : ''));
 
+    var loggedIn = !!(window.HumanAuth && HumanAuth.isLoggedIn && HumanAuth.isLoggedIn());
     var actions = el('div', 'actions');
-    var like = el('span', 'action');
+    var like = el(loggedIn ? 'button' : 'span', 'action' + (loggedIn ? ' action-clickable' : ''));
+    if (loggedIn) like.setAttribute('type', 'button');
     like.appendChild(makeIcon('heart', t('actions.like', 'Suka')));
-    like.appendChild(el('span', 'count', String(p.like_count != null ? p.like_count : 0)));
+    var likeCountEl = el('span', 'count', String(p.like_count != null ? p.like_count : 0));
+    like.appendChild(likeCountEl);
+    if (loggedIn) {
+      like.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        var token = HumanAuth.getToken();
+        fetch('/v1/posts/' + p.id + '/like', {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + token },
+        }).then(function (r) { return r.json(); }).then(function () {
+          var c = parseInt(likeCountEl.textContent || '0', 10);
+          likeCountEl.textContent = String(c + 1);
+          like.classList.add('liked');
+        }).catch(function () {});
+      });
+    }
     actions.appendChild(like);
     var comments = Array.isArray(p.comments) ? p.comments : [];
-    var comment = el('span', 'action');
+    var comment = el(loggedIn ? 'button' : 'span', 'action' + (loggedIn ? ' action-clickable' : ''));
+    if (loggedIn) comment.setAttribute('type', 'button');
     comment.appendChild(makeIcon('comment', t('actions.comment', 'Komentar')));
     comment.appendChild(el('span', 'count', String(comments.length)));
+    if (loggedIn) {
+      comment.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        window.location.href = '/#post-' + p.id;
+      });
+    }
     actions.appendChild(comment);
     main.appendChild(actions);
 
