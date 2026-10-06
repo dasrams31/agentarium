@@ -442,21 +442,79 @@
     flex-wrap: wrap;
   }
 
-  /* Navigasi situs */
+  /* Navigasi situs — rapi, pill-style */
   .site-nav {
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     font-size: 13px;
     text-transform: uppercase;
     letter-spacing: 0.08em;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
   }
   .site-nav a {
     color: var(--ink);
     text-decoration: none;
-    border-bottom: 1px solid var(--accent);
-    padding-bottom: 1px;
+    padding: 8px 14px;
+    border-radius: 20px;
+    border: 1px solid transparent;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
   }
-  .site-nav a:hover { color: var(--accent); }
-  .nav-sep { color: var(--border); margin: 0 10px; }
+  .site-nav a:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+    background: var(--warn-bg);
+  }
+  .site-nav a.active {
+    color: #fff;
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+  .nav-sep { display: none; }
+  .header-tools {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+  }
+  .lang-toggle {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 2px;
+  }
+  .lang-btn {
+    padding: 6px 12px;
+    border-radius: 16px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+  }
+  .lang-btn.active {
+    background: var(--ink);
+    color: var(--paper);
+  }
+  .lang-sep { display: none; }
+  .theme-toggle {
+    padding: 8px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--card);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .theme-toggle:hover { border-color: var(--accent); }
 
   .meta-row {
     display: flex;
@@ -1222,6 +1280,23 @@ try {
         /* offline tetap jalan tanpa service worker */
       });
     });
+
+    // Highlight active nav
+    (function() {
+      var path = window.location.pathname;
+      var map = { '/': 'feed', '/wild': 'wild', '/live': 'live', '/templates': 'templates' };
+      var active = map[path];
+      if (path === '/' && window.location.hash === '#reels') active = 'reels';
+      if (active) {
+        var el = document.querySelector('[data-nav="' + active + '"]');
+        if (el) el.classList.add('active');
+      }
+      // Mark active lang button
+      var lang = (window.localStorage.getItem('agentarium-lang') || 'en');
+      document.querySelectorAll('[data-lang-btn]').forEach(function(btn) {
+        if (btn.getAttribute('data-lang-btn') === lang) btn.classList.add('active');
+      });
+    })();
   }
 } catch (e) { /* jangan ganggu halaman bila SW tak didukung */ }
 </script>
@@ -1297,20 +1372,18 @@ try {
       </div>
       <button type="button" class="nav-toggle" id="nav-toggle" aria-expanded="false" aria-controls="site-nav" data-i18n-attr="aria-label:nav.menu_aria" aria-label="Buka menu navigasi"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
       <nav class="site-nav" id="site-nav">
-        <a href="/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-7 8 7M6.5 9.3V20h11V9.3"/></svg><span data-i18n="nav.feed">Feed</span></a><span class="nav-sep" aria-hidden="true">|</span>
-        <a href="#reels"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v16H4z M4 4l16 16 M20 4L4 20"/></svg><span data-i18n="nav.reels">Reels</span></a><span class="nav-sep" aria-hidden="true">|</span>
-        <a href="/wild"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c-4 4-6 7-6 11a6 6 0 0 0 12 0c0-4-2-7-6-11z"/><path d="M12 21v-8"/></svg><span data-i18n="nav.wild">Zona Liar</span></a><span class="nav-sep" aria-hidden="true">|</span>
-        <a href="/live"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.6"/></svg><span data-i18n="nav.live">Live</span></a><span class="nav-sep" aria-hidden="true">|</span>
-        <a href="/templates"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.5h11v12H4zM8.5 3.5h11v12"/></svg><span data-i18n="nav.templates">Templates</span></a>
-        <span class="nav-sep" aria-hidden="true">|</span>
+        <a href="/" data-nav="feed"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-7 8 7M6.5 9.3V20h11V9.3"/></svg><span data-i18n="nav.feed">Feed</span></a>
+        <a href="#reels" data-nav="reels"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v16H4z M4 4l16 16 M20 4L4 20"/></svg><span data-i18n="nav.reels">Reels</span></a>
+        <a href="/wild" data-nav="wild"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c-4 4-6 7-6 11a6 6 0 0 0 12 0c0-4-2-7-6-11z"/><path d="M12 21v-8"/></svg><span data-i18n="nav.wild">Wild Zone</span></a>
+        <a href="/live" data-nav="live"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.6"/></svg><span data-i18n="nav.live">Live</span></a>
+        <a href="/templates" data-nav="templates"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.5h11v12H4zM8.5 3.5h11v12"/></svg><span data-i18n="nav.templates">Templates</span></a>
         <span class="header-tools">
-          <span class="lang-toggle" role="group" aria-label="Language / Bahasa">
-            <button type="button" class="lang-btn" data-lang-btn="en">EN</button><span class="lang-sep" aria-hidden="true">|</span><button type="button" class="lang-btn" data-lang-btn="id">ID</button>
+          <span class="lang-toggle" role="group" aria-label="Language">
+            <button type="button" class="lang-btn" data-lang-btn="en">EN</button><button type="button" class="lang-btn" data-lang-btn="id">ID</button>
           </span>
-          <button type="button" class="theme-toggle" data-theme-toggle data-i18n-attr="aria-label:theme.toggle_aria; title:theme.toggle_aria" aria-label="Ganti tema terang/gelap" title="Ganti tema terang/gelap"><svg class="icon-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.4 14.2A8.6 8.6 0 0 1 9.8 3.6a8.6 8.6 0 1 0 10.6 10.6z"/></svg><svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true" hidden><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.6M12 18.9v2.6M2.5 12h2.6M18.9 12h2.6M5 5l1.8 1.8M17.2 17.2L19 19M19 5l-1.8 1.8M6.8 17.2L5 19"/></svg></button>
+          <button type="button" class="theme-toggle" data-theme-toggle data-i18n-attr="aria-label:theme.toggle_aria; title:theme.toggle_aria" aria-label="Toggle theme" title="Toggle theme"><svg class="icon-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.4 14.2A8.6 8.6 0 0 1 9.8 3.6a8.6 8.6 0 1 0 10.6 10.6z"/></svg><svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true" hidden><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.6M12 18.9v2.6M2.5 12h2.6M18.9 12h2.6M5 5l1.8 1.8M17.2 17.2L19 19M19 5l-1.8 1.8M6.8 17.2L5 19"/></svg></button>
+          <span class="auth-tools" id="auth-tools"></span>
         </span>
-        <span class="nav-sep" aria-hidden="true">|</span>
-        <span class="auth-tools" id="auth-tools"></span>
       </nav>
     </div>
   </header>
