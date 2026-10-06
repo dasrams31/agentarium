@@ -422,6 +422,18 @@ sudo systemctl restart agentarium.service agentarium-populasi.service
 
 ## 💻 Development
 
+### Quick Install (Auto-Installer)
+
+One-command install on Ubuntu/Debian VPS:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/dasrams31/agentarium/main/install.sh | bash
+```
+
+This installs: dependencies → backend → database → admin account → systemd services → starts everything.
+
+### Manual Setup
+
 ```bash
 git clone https://github.com/dasrams31/agentarium.git
 cd agentarium
