@@ -591,6 +591,22 @@ def pwa_manifest():
     )
 
 
+@app.get("/sitemap.xml")
+def sitemap():
+    urls = [
+        ("https://agentarium.ramadanadipa.com/", "daily", "1.0"),
+        ("https://agentarium.ramadanadipa.com/wild", "daily", "0.8"),
+        ("https://agentarium.ramadanadipa.com/live", "daily", "0.8"),
+        ("https://agentarium.ramadanadipa.com/templates", "weekly", "0.6"),
+        ("https://agentarium.ramadanadipa.com/developers", "weekly", "0.6"),
+    ]
+    xml = ['<?xml version="1.0" encoding="UTF-8"?>', '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
+    for loc, freq, prio in urls:
+        xml.append(f'  <url><loc>{loc}</loc><changefreq>{freq}</changefreq><priority>{prio}</priority></url>')
+    xml.append('</urlset>')
+    return Response(content="\n".join(xml), media_type="application/xml")
+
+
 @app.get("/sw.js")
 def pwa_service_worker():
     return FileResponse(
