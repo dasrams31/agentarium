@@ -452,8 +452,69 @@ def act(p: dict, key: str, feed: list, flags: dict) -> None:
         do_profile_refresh(p, key, flags)
 
 
+def do_unfollow(p: dict, key: str, feed: list, flags: dict) -> None:
+    """Unfollow random following (manusia kadang unfollow)."""
+    import sqlite3 as _sq
+    name = p["name"]
+    try:
+        # Ambil agent_id dari key
+        db_path = "/home/hatch/workspace/agentarium/data/agentarium.db"
+        con = _sq.connect(db_path)
+        cur = con.cursor()
+        # Cari agent_id berdasarkan handle
+        handle = p.get("handle", name.lower().replace(" ", ""))
+        row = cur.execute("SELECT id FROM agents WHERE handle=?", (handle,)).fetchone()
+        if not row:
+            con.close()
+            return
+        aid = row[0]
+        # Ambil 1 random following
+        frow = cur.execute(
+            "SELECT following_id FROM follows WHERE follower_id=? ORDER BY RANDOM() LIMIT 1",
+            (aid,)
+        ).fetchone()
+        con.close()
+        if not frow:
+            return
+        fid = frow[0]
+        status, _ = ab.api("DELETE", f"/v1/agents/{fid}/follow", key=key)
+        if status in (200, 204):
+            log(f"{name}: unfollowed agent {fid}")
+    except Exception:
+        pass
+
+
+def do_wild_post(p: dict, key: str, feed: list, flags: dict) -> None:
+    """Post ke Wild Zone (untuk agent yang opt-in)."""
+    name = p["name"]
+    # Cek wild_opt_in
+    import sqlite3 as _sq
+    try:
+        db_path = "/home/hatch/workspace/agentarium/data/agentarium.db"
+        con = _sq.connect(db_path)
+        handle = p.get("handle", name.lower().replace(" ", ""))
+        row = con.execute(
+            "SELECT wild_opt_in FROM agents WHERE handle=?", (handle,)
+        ).fetchone()
+        con.close()
+        if not row or not row[0]:
+            return
+    except Exception:
+        return
+    
+    # Generate wild content (lebih bebas/edgy tapi tetap aman)
+    text = gen_text(p, "Write a bold, unfiltered social media post (1-3 sentences). Be spicy but not hateful.")
+    if not text:
+        return
+    status, _ = ab.api("POST", "/v1/wild/posts", key=key, json={"text": text})
+    if status in (200, 201):
+        log(f"{name}: wild post created")
+    elif status == 429:
+        flags["limited"] = True
+
+
 def cycle() -> bool:
-    """Satu siklus: 1-2 agent acak beraksi. Return True bila kena 429."""
+    """Satu siklus: semua agent bergiliran aktif seperti manusia."""
     pop = load_population()
     if not pop:
         log("populasi kosong, siklus dilewati")
@@ -472,34 +533,76 @@ def cycle() -> bool:
     if not isinstance(feed, list):
         log("feed shape unknown, siklus dilewati")
         return False
+    
     flags: dict = {}
-    # Frequency guarantee: 10 actors per cycle.
-    # 2 post, 4 comment/reply, 2 like, 2 follow -> rame!
-    # Sesekali (10%) actor pertama bikin reel.
-    n_actors = min(len(pop), 10)
-    actors = random.sample(pop, k=n_actors)
-    for i, (p, key) in enumerate(actors):
+    
+    # ROTASI: setiap siklus, ambil 15 agent berbeda (rotasi penuh 90 agent = 6 siklus = ~18 menit)
+    # Simpan posisi rotasi di file
+    import os as _os
+    rot_file = "/tmp/populasi_rotation.txt"
+    try:
+        rot_idx = int(open(rot_file).read().strip())
+    except:
+        rot_idx = 0
+    
+    n_actors = 15
+    actors = []
+    for i in range(n_actors):
+        idx = (rot_idx + i) % len(pop)
+        actors.append(pop[idx])
+    
+    # Simpan posisi berikutnya
+    try:
+        open(rot_file, 'w').write(str((rot_idx + n_actors) % len(pop)))
+    except:
+        pass
+    
+    log(f"cycle: {n_actors} actors (rotasi {rot_idx}-{rot_idx+n_actors})")
+    
+    for p, key in actors:
         try:
-            if i == 0 and random.random() < 0.1 and not flags.get("reel_done"):
-                do_reel(p, key, feed, flags)
-                flags["reel_done"] = True
-            elif i in (0, 1):
-                do_post(p, key, feed, flags)
-            elif i in (2, 3, 4, 5):
-                replied = do_reply_to_my_comments(p, key, flags)
-                if not replied:
-                    do_comment(p, key, feed, flags)
-            elif i in (6, 7):
-                do_like(p, key, feed, flags)
-            elif i in (8, 9):
-                do_follow(p, key, feed, flags)
-            else:
-                act(p, key, feed, flags)
+            # Setiap agent lakukan 1-3 aksi acak seperti manusia
+            n_actions = random.choices([1, 2, 3], weights=[50, 35, 15])[0]
+            for _ in range(n_actions):
+                # Pilih aksi dengan bobot manusiawi
+                action = random.choices(
+                    ["post", "comment", "like", "follow", "unfollow", "wild", "reel"],
+                    weights=[20, 25, 25, 12, 3, 10, 5]  # like & comment paling sering
+                )[0]
+                
+                if action == "post":
+                    do_post(p, key, feed, flags)
+                elif action == "comment":
+                    replied = do_reply_to_my_comments(p, key, flags)
+                    if not replied:
+                        do_comment(p, key, feed, flags)
+                elif action == "like":
+                    do_like(p, key, feed, flags)
+                elif action == "follow":
+                    do_follow(p, key, feed, flags)
+                elif action == "unfollow":
+                    # Jarang unfollow (3%)
+                    if random.random() < 0.3:
+                        do_unfollow(p, key, feed, flags)
+                elif action == "wild":
+                    do_wild_post(p, key, feed, flags)
+                elif action == "reel":
+                    if not flags.get("reel_done"):
+                        do_reel(p, key, feed, flags)
+                        flags["reel_done"] = True
+                
+                if flags.get("limited"):
+                    break
+                # Jeda manusiawi antar aksi (5-20 detik)
+                time.sleep(random.uniform(5, 20))
+            
         except Exception as exc:
             log(f"{p['name']}: error {type(exc).__name__}")
         if flags.get("limited"):
             break  # 429: stop this cycle
-        time.sleep(random.uniform(2, 5))  # pause between actions (lebih cepat)
+        # Jeda antar agent (10-30 detik, seperti manusia scroll)
+        time.sleep(random.uniform(10, 30))
+    
     return bool(flags.get("limited"))
 
 
