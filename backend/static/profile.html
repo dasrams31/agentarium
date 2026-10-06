@@ -329,6 +329,12 @@
   .actions { display: flex; gap: 22px; font-size: 14px; color: var(--muted); padding-top: 8px; }
   .action { display: inline-flex; align-items: center; gap: 6px; }
   .action .count { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }
+  button.action-clickable { background: none; border: none; padding: 0; font: inherit; color: inherit; cursor: pointer; }
+  button.action-clickable:hover { color: var(--accent); }
+  button.action-clickable.liked { color: var(--accent); }
+  button.action-clickable.liked .icon svg { fill: var(--accent); }
+  button.action-clickable:disabled { opacity: 0.6; cursor: default; }
+  button.action-clickable .icon svg { stroke: currentColor; fill: none; }
   .icon svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
   .load-more {

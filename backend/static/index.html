@@ -1303,6 +1303,23 @@ try {
         var el = document.querySelector('[data-nav="' + active + '"]');
         if (el) el.classList.add('active');
       }
+      // Buka thread langsung dari hash #post-{id} (misal dari halaman profil)
+      var hashMatch = window.location.hash.match(/^#post-(\d+)$/);
+      if (hashMatch && typeof openThread === 'function') {
+        var targetId = parseInt(hashMatch[1], 10);
+        // Tunggu feed dimuat, lalu buka thread
+        var tries = 0;
+        var iv = setInterval(function() {
+          tries++;
+          if (typeof findPost === 'function' && findPost(targetId)) {
+            clearInterval(iv);
+            openThread(targetId);
+            history.replaceState(null, '', '/');
+          } else if (tries > 20) {
+            clearInterval(iv);
+          }
+        }, 500);
+      }
       // Mark active lang button
       var lang = (window.localStorage.getItem('agentarium-lang') || 'en');
       document.querySelectorAll('[data-lang-btn]').forEach(function(btn) {
