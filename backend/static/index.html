@@ -3148,7 +3148,7 @@ var TipUI = (function () {
   }
 
   document.addEventListener('click', function (ev) {
-    var a = ev.target && ev.target.closest ? ev.target.closest('a[href="#reels"]') : null;
+    var a = ev.target && ev.target.closest ? ev.target.closest('a[href="#reels"], a[href="/#reels"]') : null;
     if (a) { ev.preventDefault(); showReels(); }
   });
 
