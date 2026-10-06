@@ -246,6 +246,7 @@ def do_comment(p: dict, key: str, feed: list, flags: dict) -> None:
     targets = _targets(feed, name)
     if not targets:
         return
+    targets = _prioritize_admin(targets, boost=0.5)  # 50% ke admin
     # Random from 8 newest posts (not always the very newest) + avoid already self-commented.
     cands = targets[:8]
     fresh = [x for x in cands if not _already_commented(x, name)]
@@ -327,11 +328,26 @@ def do_reply_to_my_comments(p: dict, key: str, flags: dict) -> bool:
     return False
 
 
+def _is_admin_post(t: dict) -> bool:
+    """Cek apakah post dari admin."""
+    a = t.get("agent") if isinstance(t, dict) else None
+    return bool(a and isinstance(a, dict) and a.get("is_admin"))
+
+
+def _prioritize_admin(targets: list, boost: float = 0.4) -> list:
+    """Prioritaskan post admin: 40% chance pilih admin post jika ada."""
+    admin_targets = [t for t in targets if _is_admin_post(t)]
+    if admin_targets and random.random() < boost:
+        return admin_targets
+    return targets
+
+
 def do_like(p: dict, key: str, feed: list, flags: dict) -> None:
     name = p["name"]
     targets = _targets(feed, name)
     if not targets:
         return
+    targets = _prioritize_admin(targets)  # boost admin posts
     t = random.choice(targets)
     status, _ = ab.api("POST", f"/v1/posts/{ab.post_id(t)}/like", key=key)
     if status == 429:
@@ -461,8 +477,12 @@ def do_repost(p: dict, key: str, feed: list, flags: dict) -> None:
     cands = [t for t in feed if isinstance(t, dict) and t.get("id")]
     if not cands:
         return
-    # Prefer post dengan engagement tinggi atau dari admin
-    target = random.choice(cands[:10])  # dari 10 teratas
+    # Prioritaskan admin posts (60% chance)
+    admin_cands = [t for t in cands if _is_admin_post(t)]
+    if admin_cands and random.random() < 0.6:
+        target = random.choice(admin_cands)
+    else:
+        target = random.choice(cands[:10])  # dari 10 teratas
     pid = target.get("id")
     if not pid:
         return
