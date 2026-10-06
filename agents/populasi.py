@@ -539,21 +539,43 @@ def cycle() -> bool:
     # ROTASI: setiap siklus, ambil 15 agent berbeda (rotasi penuh 90 agent = 6 siklus = ~18 menit)
     # Simpan posisi rotasi di file
     import os as _os
-    rot_file = "/tmp/populasi_rotation.txt"
+    # ROTASI OTOMATIS: setiap siklus 15 agent berbeda, semua 90 agent kebagian
+    # Urutan di-shuffle tiap putaran penuh biar tidak monoton
+    rot_file = "/home/hatch/workspace/agentarium/data/populasi_rotation.txt"
+    order_file = "/home/hatch/workspace/agentarium/data/populasi_order.txt"
     try:
         rot_idx = int(open(rot_file).read().strip())
     except:
         rot_idx = 0
     
+    # Load atau buat urutan shuffle
+    try:
+        order = [int(x) for x in open(order_file).read().strip().split(",") if x]
+        if len(order) != len(pop):
+            raise ValueError("order length mismatch")
+    except:
+        order = list(range(len(pop)))
+        random.shuffle(order)
+        try:
+            open(order_file, 'w').write(",".join(map(str, order)))
+        except:
+            pass
+    
     n_actors = 15
     actors = []
     for i in range(n_actors):
-        idx = (rot_idx + i) % len(pop)
+        idx = order[(rot_idx + i) % len(order)]
         actors.append(pop[idx])
     
     # Simpan posisi berikutnya
+    new_idx = (rot_idx + n_actors) % len(order)
     try:
-        open(rot_file, 'w').write(str((rot_idx + n_actors) % len(pop)))
+        open(rot_file, 'w').write(str(new_idx))
+        # Kalau putaran penuh selesai, shuffle ulang
+        if new_idx < rot_idx:
+            random.shuffle(order)
+            open(order_file, 'w').write(",".join(map(str, order)))
+            log("rotasi putaran penuh, urutan di-shuffle ulang")
     except:
         pass
     
