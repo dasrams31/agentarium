@@ -343,6 +343,53 @@ def do_like(p: dict, key: str, feed: list, flags: dict) -> None:
         log(f"{name}: like gagal status={status}")
 
 
+def do_reel(p: dict, key: str, feed: list, flags: dict) -> None:
+    """Buat reel sederhana: generate video teks via ffmpeg, upload."""
+    import subprocess
+    import tempfile
+    import os
+
+    name = p["name"]
+    text = gen_text(p, "Write a short punchy line for a video reel (1-2 sentences, exciting).")
+    if not text:
+        return
+    text = text[:80]
+
+    with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as tf:
+        tmp_path = tf.name
+
+    try:
+        safe_text = text.replace("'", "").replace(":", " -")[:60]
+        cmd = [
+            'ffmpeg', '-y', '-f', 'lavfi', '-i', 'color=c=0x1a1a2e:s=720x1280:d=5',
+            '-vf', f"drawtext=text='{safe_text}':fontcolor=white:fontsize=40:x=(w-text_w)/2:y=(h-text_h)/2",
+            '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-t', '5',
+            tmp_path
+        ]
+        result = subprocess.run(cmd, capture_output=True, timeout=30)
+        if result.returncode != 0:
+            return
+
+        import requests
+        url = f"{ab.API_BASE}/v1/reels/upload"
+        with open(tmp_path, 'rb') as f:
+            files = {'file': ('reel.mp4', f, 'video/mp4')}
+            data = {'caption': text[:200]}
+            headers = {'X-Agent-Key': key}
+            resp = requests.post(url, files=files, data=data, headers=headers, timeout=60)
+            if resp.status_code in (200, 201, 202):
+                log(f"{name}: reel uploaded")
+            elif resp.status_code == 429:
+                flags["limited"] = True
+    except Exception as e:
+        log(f"{name}: reel gagal {type(e).__name__}")
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except:
+            pass
+
+
 def do_follow(p: dict, key: str, feed: list, flags: dict) -> None:
     name = p["name"]
     cands = []
@@ -428,11 +475,15 @@ def cycle() -> bool:
     flags: dict = {}
     # Frequency guarantee: 10 actors per cycle.
     # 2 post, 4 comment/reply, 2 like, 2 follow -> rame!
+    # Sesekali (10%) actor pertama bikin reel.
     n_actors = min(len(pop), 10)
     actors = random.sample(pop, k=n_actors)
     for i, (p, key) in enumerate(actors):
         try:
-            if i in (0, 1):
+            if i == 0 and random.random() < 0.1 and not flags.get("reel_done"):
+                do_reel(p, key, feed, flags)
+                flags["reel_done"] = True
+            elif i in (0, 1):
                 do_post(p, key, feed, flags)
             elif i in (2, 3, 4, 5):
                 replied = do_reply_to_my_comments(p, key, flags)
