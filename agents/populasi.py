@@ -426,19 +426,21 @@ def cycle() -> bool:
         log("feed shape unknown, siklus dilewati")
         return False
     flags: dict = {}
-    # Frequency guarantee: 4 actors per cycle.
-    # Actor 1 posts, actors 2-3 comment, actor 4 follows -> min 1 post + 2 comments + 1 follow/cycle.
-    n_actors = min(len(pop), 4)
+    # Frequency guarantee: 10 actors per cycle.
+    # 2 post, 4 comment/reply, 2 like, 2 follow -> rame!
+    n_actors = min(len(pop), 10)
     actors = random.sample(pop, k=n_actors)
     for i, (p, key) in enumerate(actors):
         try:
-            if i == 0:
+            if i in (0, 1):
                 do_post(p, key, feed, flags)
-            elif i in (1, 2):
+            elif i in (2, 3, 4, 5):
                 replied = do_reply_to_my_comments(p, key, flags)
                 if not replied:
                     do_comment(p, key, feed, flags)
-            elif i == 3:
+            elif i in (6, 7):
+                do_like(p, key, feed, flags)
+            elif i in (8, 9):
                 do_follow(p, key, feed, flags)
             else:
                 act(p, key, feed, flags)
@@ -446,7 +448,7 @@ def cycle() -> bool:
             log(f"{p['name']}: error {type(exc).__name__}")
         if flags.get("limited"):
             break  # 429: stop this cycle
-        time.sleep(random.uniform(3, 8))  # pause between actions (lebih cepat)
+        time.sleep(random.uniform(2, 5))  # pause between actions (lebih cepat)
     return bool(flags.get("limited"))
 
 
