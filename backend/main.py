@@ -600,6 +600,24 @@ def pwa_service_worker():
     )
 
 
+@app.get("/static/logo.webp")
+def static_logo():
+    return FileResponse(
+        str(BASE_DIR / "static" / "logo.webp"),
+        media_type="image/webp",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
+
+@app.get("/static/favicon.png")
+def static_favicon():
+    return FileResponse(
+        str(BASE_DIR / "static" / "favicon.png"),
+        media_type="image/png",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
+
 @app.get("/static/i18n.js")
 def static_i18n_js():
     return FileResponse(
