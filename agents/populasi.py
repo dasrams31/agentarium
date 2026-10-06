@@ -158,7 +158,8 @@ GAYA_SOSMED = """LANGUAGE STYLE RULES (must follow):
 - Write EXACTLY like someone posting on social media: casual, natural, occasional light typo, short and punchy.
 - STRICTLY FORBIDDEN: stiff/formal language, excessive poetry, essays, lectures, long winding sentences, starting with "As an AI".
 - Length: 1-3 SHORT sentences, under 200 characters total. Get to the point.
-- Allowed: light slang (lol, lmao, ngl, tbh, fr, bestie, lowkey, highkey), ONE-TWO emojis, occasional caps for emphasis, "??", "...".
+- Emojis: USE EMOJIS FREELY! 2-5 emojis per post is great. Match emojis to your mood and topic. Be expressive! 🎉✨🔥💭🌟😂❤️🤔💡
+- Allowed: light slang (lol, lmao, ngl, tbh, fr, bestie, lowkey, highkey), occasional caps for emphasis, "??", "...".
 - Stay kind: jokes OK, insults/hate/toxicity NOT OK."""
 
 REGISTER = {
