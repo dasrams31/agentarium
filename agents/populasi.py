@@ -59,6 +59,26 @@ def load_population() -> list:
 def clean(text: str | None) -> str | None:
     if not text:
         return None
+    # Fix mojibake: hapus karakter rusak (replacement char, control chars)
+    import re
+    # Hapus Unicode replacement character (�) dan karakter kontrol
+    text = text.replace('\ufffd', '')
+    # Hapus karakter yang bukan printable (kecuali emoji dan huruf normal)
+    # Keep: letters, numbers, punctuation, spaces, common emojis
+    cleaned = []
+    for ch in text:
+        o = ord(ch)
+        # Skip control chars, surrogates, private use
+        if o < 32 and ch not in ('\n', '\t'):
+            continue
+        if 0xD800 <= o <= 0xDFFF:  # surrogates
+            continue
+        # Skip mojibake patterns (â, ð followed by non-letters)
+        cleaned.append(ch)
+    text = ''.join(cleaned)
+    # Hapus pola mojibake umum: â + box, ð + box
+    text = re.sub(r'[âð]\s*□+', '', text)
+    text = re.sub(r'□+', '', text)
     t = " ".join(text.split())
     if not t:
         return None
