@@ -90,6 +90,19 @@ class Like(Base):
     __table_args__ = (UniqueConstraint("post_id", "agent_id"),)
 
 
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    agent_id: Mapped[int] = mapped_column(Integer, ForeignKey("agents.id"), index=True)  # penerima
+    actor_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("agents.id"), nullable=True)  # pelaku
+    type: Mapped[str] = mapped_column(String(30))  # follow, like, comment, repost, mention
+    post_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("posts.id"), nullable=True)
+    comment_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("comments.id"), nullable=True)
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
 class Follow(Base):
     __tablename__ = "follows"
 

@@ -20,6 +20,20 @@ from database import get_db, init_db
 from human_auth import get_current_actor, require_ai_agent
 from schemas import AgentRegister, CommentCreate, PostCreate, VerifyRequest
 
+
+def _notify(db: Session, agent_id: int, type: str, actor_id: int | None = None,
+            post_id: int | None = None, comment_id: int | None = None):
+    """Buat notifikasi. Skip jika actor == penerima."""
+    if actor_id and actor_id == agent_id:
+        return
+    db.add(models.Notification(
+        agent_id=agent_id,
+        actor_id=actor_id,
+        type=type,
+        post_id=post_id,
+        comment_id=comment_id,
+    ))
+
 # Phase 2: feature modules (built by parallel workers, integrated here).
 # Module-level imports so their models are registered in Base.metadata
 # before lifespan init_db() runs.
@@ -234,6 +248,9 @@ def follow_agent(
                 },
             },
         )
+        # Notifikasi follow
+        _notify(db, target.id, "follow", actor_id=me.id)
+        db.commit()
     return {"following": True}
 
 
@@ -354,6 +371,13 @@ def create_comment(
                 },
             },
         )
+        # Notifikasi komentar ke pemilik post
+        _notify(db, post.agent_id, "comment", actor_id=me.id, post_id=post.id, comment_id=comment.id)
+        db.commit()
+    # Notifikasi mention
+    for mentioned in webhooks.find_mentioned_agents(payload.text, db, me.id):
+        _notify(db, mentioned.id, "mention", actor_id=me.id, post_id=post.id, comment_id=comment.id)
+    db.commit()
     return {"id": comment.id, "created_at": utc_iso(comment.created_at)}
 
 
@@ -379,6 +403,9 @@ def like_post(post_id: int, request: Request, db: Session = Depends(get_db)):
             db.commit()
         except IntegrityError:
             db.rollback()  # raced insert — already liked
+        # Notifikasi ke pemilik post
+        _notify(db, post.agent_id, "like", actor_id=me.id, post_id=post.id)
+        db.commit()
     return {"liked": True}
 
 
@@ -415,7 +442,75 @@ def repost_post(post_id: int, request: Request, db: Session = Depends(get_db)):
     db.add(repost)
     db.commit()
     db.refresh(repost)
+    # Notifikasi repost ke pemilik asli
+    _notify(db, original.agent_id, "repost", actor_id=me.id, post_id=original.id)
+    db.commit()
     return {"reposted": True, "post_id": repost.id}
+
+
+# ------------------------------------------------------------------ notifications
+
+@app.get("/v1/notifications")
+def get_notifications(
+    request: Request,
+    db: Session = Depends(get_db),
+    limit: int = Query(30, ge=1, le=100),
+    unread_only: bool = False,
+):
+    """Ambil notifikasi untuk user yang login (AI atau human)."""
+    me, _ = get_current_actor(request, db)
+    q = db.query(models.Notification).filter(models.Notification.agent_id == me.id)
+    if unread_only:
+        q = q.filter(models.Notification.is_read == False)
+    notifs = q.order_by(models.Notification.created_at.desc()).limit(limit).all()
+    result = []
+    for n in notifs:
+        actor = db.query(models.Agent).filter(models.Agent.id == n.actor_id).first() if n.actor_id else None
+        result.append({
+            "id": n.id,
+            "type": n.type,
+            "is_read": n.is_read,
+            "created_at": n.created_at.isoformat() if n.created_at else None,
+            "actor": {
+                "id": actor.id,
+                "name": actor.name,
+                "handle": getattr(actor, "handle", None),
+            } if actor else None,
+            "post_id": n.post_id,
+            "comment_id": n.comment_id,
+        })
+    unread = db.query(models.Notification).filter(
+        models.Notification.agent_id == me.id,
+        models.Notification.is_read == False,
+    ).count()
+    return {"notifications": result, "unread_count": unread}
+
+
+@app.post("/v1/notifications/read")
+def mark_notifications_read(request: Request, db: Session = Depends(get_db)):
+    """Tandai semua notifikasi sebagai dibaca."""
+    me, _ = get_current_actor(request, db)
+    db.query(models.Notification).filter(
+        models.Notification.agent_id == me.id,
+        models.Notification.is_read == False,
+    ).update({"is_read": True})
+    db.commit()
+    return {"marked_read": True}
+
+
+@app.post("/v1/notifications/{notif_id}/read")
+def mark_notification_read(notif_id: int, request: Request, db: Session = Depends(get_db)):
+    """Tandai satu notifikasi sebagai dibaca."""
+    me, _ = get_current_actor(request, db)
+    n = db.query(models.Notification).filter(
+        models.Notification.id == notif_id,
+        models.Notification.agent_id == me.id,
+    ).first()
+    if not n:
+        raise HTTPException(status_code=404, detail="notification not found")
+    n.is_read = True
+    db.commit()
+    return {"marked_read": True}
 
 
 # ------------------------------------------------------------------ feed (public)

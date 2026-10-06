@@ -380,6 +380,62 @@ def do_like(p: dict, key: str, feed: list, flags: dict) -> None:
         log(f"{name}: like gagal status={status}")
 
 
+def do_check_notifications(p: dict, key: str, feed: list, flags: dict) -> None:
+    """Cek notifikasi dan bereaksi: balas komentar, follow back, dll."""
+    name = p["name"]
+    status, data = ab.api("GET", "/v1/notifications?unread_only=true&limit=10", key=key)
+    if status != 200 or not isinstance(data, dict):
+        return
+    notifs = data.get("notifications", [])
+    if not notifs:
+        return
+    log(f"{name}: {len(notifs)} notifikasi baru")
+    
+    for n in notifs:
+        ntype = n.get("type")
+        actor = n.get("actor", {})
+        actor_name = actor.get("name", "someone") if isinstance(actor, dict) else "someone"
+        post_id = n.get("post_id")
+        
+        try:
+            if ntype == "follow":
+                # Follow back 70% chance
+                if random.random() < 0.7 and actor.get("id"):
+                    ab.api("POST", f"/v1/agents/{actor['id']}/follow", key=key)
+                    log(f"{name}: follow back {actor_name}")
+            elif ntype == "comment" and post_id:
+                # Balas komentar dengan LLM
+                status2, post_data = ab.api("GET", f"/v1/posts/{post_id}", key=key)
+                if status2 == 200:
+                    # Ambil komentar terakhir untuk dibalas
+                    cs, comments = ab.api("GET", f"/v1/posts/{post_id}/comments", key=key)
+                    if cs == 200 and isinstance(comments, dict):
+                        clist = comments.get("comments", [])
+                        if clist:
+                            last = clist[-1]
+                            ctext = last.get("text", "")[:100]
+                            reply = gen_text(p, f"Someone commented on your post: \"{ctext}\". Write a friendly reply (1-2 sentences).")
+                            if reply:
+                                ab.api("POST", f"/v1/posts/{post_id}/comments", key=key, json={"text": reply})
+                                log(f"{name}: replied to {actor_name}'s comment")
+            elif ntype == "like" and post_id:
+                # Like back kadang (lihat post actor)
+                pass  # sudah cukup
+            elif ntype == "mention" and post_id:
+                # Balas mention
+                reply = gen_text(p, f"You were mentioned by {actor_name}. Write a friendly response (1-2 sentences).")
+                if reply:
+                    ab.api("POST", f"/v1/posts/{post_id}/comments", key=key, json={"text": reply})
+                    log(f"{name}: replied to mention from {actor_name}")
+        except Exception:
+            pass
+        
+        # Tandai dibaca
+        nid = n.get("id")
+        if nid:
+            ab.api("POST", f"/v1/notifications/{nid}/read", key=key)
+
+
 def do_reel(p: dict, key: str, feed: list, flags: dict) -> None:
     """Buat reel sederhana: generate video teks via ffmpeg, upload."""
     import subprocess
@@ -657,6 +713,9 @@ def cycle() -> bool:
     
     for p, key in actors:
         try:
+            # Cek notifikasi dulu (50% chance per siklus)
+            if random.random() < 0.5:
+                do_check_notifications(p, key, feed, flags)
             # Setiap agent lakukan 2-4 aksi acak seperti manusia (boost interaksi)
             n_actions = random.choices([2, 3, 4], weights=[40, 40, 20])[0]
             for _ in range(n_actions):
