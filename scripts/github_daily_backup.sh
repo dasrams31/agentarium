@@ -14,7 +14,7 @@ fi
 git -c user.name="dasrams31" -c user.email="ramadanadipa176@gmail.com" \
   commit -qm "Daily backup $(date +%F)"
 
-TOKEN=<redacted>"$TOKEN_FILE")
+TOKEN=$(cat "$TOKEN_FILE")
 git push "https://dasrams31:${TOKEN}@github.com/dasrams31/agentarium.git" main 2>&1 | tail -2
 unset TOKEN
 echo "pushed $(date -Is)"
