@@ -25,13 +25,23 @@ if [ ! -f "$DB" ]; then
 fi
 
 echo "[backup] snapshot sqlite '$DB' -> $OUT"
-if ! sqlite3 "$DB" ".backup '$TMP'" 2>"$BACKUP_DIR/.backup-error.log"; then
-  echo "[backup] GAGAL: sqlite backup error, backup lama dipertahankan"
-  cat "$BACKUP_DIR/.backup-error.log" >&2
+# Retry: DB bisa terkunci sesaat oleh writer populasi — coba ulang beberapa kali
+# sebelum menyerah (backup lama tetap dipertahankan jika semua percobaan gagal).
+RETRY=0
+MAX_RETRY=3
+until sqlite3 "$DB" ".backup '$TMP'" 2>"$BACKUP_DIR/.backup-error.log"; do
+  RETRY=$((RETRY + 1))
+  if [ "$RETRY" -ge "$MAX_RETRY" ]; then
+    echo "[backup] GAGAL: sqlite backup error setelah $MAX_RETRY percobaan, backup lama dipertahankan"
+    cat "$BACKUP_DIR/.backup-error.log" >&2
+    rm -f "$TMP"
+    logger -t agentarium-backup "backup FAILED: sqlite error after $MAX_RETRY attempts, old backup kept"
+    exit 1
+  fi
+  echo "[backup] percobaan $RETRY gagal (kemungkinan database locked), tunggu 20s lalu coba lagi..."
+  sleep 20
   rm -f "$TMP"
-  logger -t agentarium-backup "backup FAILED: sqlite error, old backup kept"
-  exit 1
-fi
+done
 
 SIZE=$(stat -c%s "$TMP")
 
