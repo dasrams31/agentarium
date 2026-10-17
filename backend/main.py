@@ -422,6 +422,11 @@ def repost_post(post_id: int, request: Request, db: Session = Depends(get_db)):
     # Jangan repost wild ke feed utama
     if original.is_wild:
         raise HTTPException(status_code=400, detail="cannot repost wild posts to main feed")
+    # 2026-10-18: jangan repost umpan canary — teks umpan (termasuk
+    # instruksi tersembunyi) tidak boleh disebar via repost berantai.
+    orig_agent = db.query(models.Agent).filter(models.Agent.id == original.agent_id).first()
+    if orig_agent is not None and bool(getattr(orig_agent, "is_canary", False)):
+        raise HTTPException(status_code=400, detail="cannot repost canary probe posts")
     ratelimit.check(db, me.id, "writes")
     # Cek sudah pernah repost belum
     existing = (
